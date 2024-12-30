@@ -19,3 +19,45 @@ Solar powered weather station with 4000mAh lithium battery backup, featuring aut
 - Attempt to use collected data to make predictions using custom AI model.
 
 ### Concept Design Phase
+#### Problem Breakdown
+##### Transmitter side i.e. external weather station
+1. Microcontroller & Processing subsystem
+   i.   Need a microcontroller and an external storage system. 
+   ii.  Readings need to be timestamped and transmitted.
+2. Sensors subsystem
+   i.   Need various sensors to get readings. 
+   ii.  Need to be low power and reasonably accurate. 
+   iii. Custom design for anemometer and wind vane.
+3. Power subsystem
+   i.  Power balance i.e. power coming in through various means enough to power the entire system without outage. 
+   ii.  Various power saving tricks.
+4. Housing
+   i.  Need to store all electronics in a weather resistant housing design.
+   ii. Not be an eye-sore.
+
+##### Receiver side i.e. internal server
+1. Microcontroller & Processing subsystem
+   i.  Microcontroller to receive and process data.
+   ii. Store data locally for user reference.
+2. User Interface
+   i. An interface to give readings to user.
+3. Power
+   i. Easy to power interface.
+#### Solution Matrix
+Problem is relatively simple, and with experience with sensors and microcontrollers, I can make well educated decisions.
+
+| Transmitter Side                       | i                                                                                                                                                                                                                    | ii                                                                                 | iii                                                        |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| Microcontroller & Processing subsystem | ESP32 or Arduino Nano. MicroSD external module to read and write.                                                                                                                                                    | Real Time Clock module for timestamps. Transmission through Bluetooth or WiFi.     | -                                                          |
+| Sensors subsystem                      | I2C compatible sensors. BME180/280/680 for temp, humidity and pressure. S12SD for UV.                                                                                                                                | Listed modules are all reasonably accurate and power efficient.                    | Hall effect sensors for wind data build. 3D printed parts. |
+| Power subsystem                        | Large solar panel placed facing north for maximum power generation. Wind is inefficient at this scale. Charging circuit for a lithium battery to store excess power to run system during bad weather and night-time. | ESP32 has configurable modules i.e. modems can be turned off. Also has deep sleep. | -                                                          |
+| Housing                                | Stevenson screen to prevent water from entering system.                                                                                                                                                              | Later stage design dependant.                                                      | -                                                          |
+
+| Receiver Side                          | i                                                                                                                                                                  | ii                                         |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------ |
+| Microcontroller & Processing subsystem | ESP32 or Arduino Nano.                                                                                                                                             | MicroSD external module to read and write. |
+| User Interface                         | Small LED panel display to show most recent readings/current status. Online control panel accessible through internet anywhere shows current/historic/future data. | -                                          |
+| Power                                  | USB C power interface, simple.                                                                                                                                     | -                                          |
+
+#### Solution Selection
+
