@@ -44,7 +44,6 @@ Solar powered weather station with 4000mAh lithium battery backup, featuring aut
 3. Power
    i. Easy to power interface.
 #### Solution Matrix
-Problem is relatively simple, and with experience with sensors and microcontrollers, I can make well educated decisions.
 
 | Transmitter Side                       | i                                                                                                                                                                                                                    | ii                                                                                 | iii                                                        |
 | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | ---------------------------------------------------------- |
@@ -61,3 +60,20 @@ Problem is relatively simple, and with experience with sensors and microcontroll
 
 #### Solution Selection
 
+The problem is relatively simple, and with my experience with sensors and microcontrollers, I can make well educated decisions.
+##### Transmitter side i.e. external weather station
+
+| Subproblem                             | Parts Chosen & Reasoning                                                                                                                                                                                                                                                                                                                                                 |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Microcontroller & Processing subsystem | ESP32 microcontroller - Inbuilt wifi, power saving modes with configurable setups. Arduino Nano does not have these, and would require an external networking adapter.<br><br>MicroSD adapter - To store readings locally, simplest solution.<br><br>DS3231 RTC Module - To get time readings reliably, ESP32s RTC resets on restart so it is not reliable.              |
+| Sensors subsystem                      | BME280 - For temperature, humidity and pressure readings. Is power efficient and reliable. DHT22 is unreliable as it has a large error.<br><br>S12SD - For UV readings, simplest solution, compatible with microcontroller.<br><br>49E Hall Effect Sensor - Analog 3 pin hall effect sensor to be used in the anemometer and wind vane build.                            |
+| Power subsystem                        | 5V 500mAh Solar Panel - High current solar panel to generate power reliably.<br><br>4000mAh Single Cell Battery - High capacity battery to store excess power generated. Can cover system power requirements for weeks.<br><br>These combined together allow for the system to function off the grid, system will be designed to save power using deep sleep techniques. |
+| Housing                                | Custom designed and 3D printed parts. Stevenson screen to waterproof the shell.                                                                                                                                                                                                                                                                                          |
+
+##### Receiver side i.e. internal server
+
+| Subproblem                             | Parts Chosen & Reasoning                                                                                                                                                                      |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Microcontroller & Processing subsystem | Same setup as weather station, ESP32 with an SD card adapter. To maintain parity and prevent incompatibility issues.                                                                          |
+| User Interface                         | SSD1306 Small OLED Display - To display current readings as well as status.<br>ESPHome - IoT server hosted locally to show current/historic/future data to user, accessible through internet. |
+| Power                                  | USB-C charger.                                                                                                                                                                                |
