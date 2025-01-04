@@ -14,7 +14,7 @@ int bme280_get_humidity(Adafruit_BME280 bme280);
 int bme280_get_pressure(Adafruit_BME280 bme280);
 
 // Change sensor mode
-void bme280_sleep_mode(Adafruit_BME280 bme280);
-void bme280_normal_mode(Adafruit_BME280 bme280);
+void bme280_sleep_mode();
+void bme280_normal_mode();
 
 #endif
