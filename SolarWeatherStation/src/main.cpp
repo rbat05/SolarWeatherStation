@@ -1,10 +1,14 @@
-#include <Arduino.h>
+#include <Arduino.h> // Built-in library
+
 
 #include "49e_wind_speed_dir.hpp"
 #include "bme280_temp_humi_pres.hpp"
 #include "ds3231_rtc.hpp"
 #include "s12sd_uv.hpp"
 #include "sd_read_write.hpp"
+
+// Connected via I2C, G22 = SCL, G21 = SDA
+Adafruit_BME280 bme280;
 
 void setup() {
 	Serial.begin(115200);
