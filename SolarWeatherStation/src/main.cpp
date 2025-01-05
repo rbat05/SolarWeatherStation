@@ -6,11 +6,14 @@
 #include "s12sd_uv.hpp"
 #include "sd_read_write.hpp"
 
-// Connected via I2C, G22 = SCL, G21 = SDA
+// BME280 - Connected via I2C, G22 = SCL, G21 = SDA
 Adafruit_BME280 bme280;
 
-// Connected via Analog, G36 = UV
+// S12SD - Connected via Analog, G36 = UV
 const int UV_PIN = 36;
+
+// DS3231 - Connected via I2C, G22 = SCL, G21 = SDA
+RTC_DS3231 rtc;
 
 void setup() {
   Serial.begin(115200);
