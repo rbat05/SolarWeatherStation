@@ -1,5 +1,4 @@
-#include <Arduino.h> // Built-in library
-
+#include <Arduino.h>  // Built-in library
 
 #include "49e_wind_speed_dir.hpp"
 #include "bme280_temp_humi_pres.hpp"
@@ -10,11 +9,12 @@
 // Connected via I2C, G22 = SCL, G21 = SDA
 Adafruit_BME280 bme280;
 
+// Connected via Analog, G36 = UV
+const int UV_PIN = 36;
+
 void setup() {
-	Serial.begin(115200);
-	Serial.println("Hello World");
+  Serial.begin(115200);
+  Serial.println("Hello World");
 }
 
-void loop() {
-	
-}
+void loop() {}
