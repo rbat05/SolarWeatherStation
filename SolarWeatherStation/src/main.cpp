@@ -1,4 +1,8 @@
 #include <Arduino.h>  // Built-in library
+#include <Wire.h>
+#include <string.h>
+
+#include <iostream>  // Built-in library
 
 #include "49e_wind_speed_dir.hpp"
 #include "bme280_temp_humi_pres.hpp"
@@ -15,9 +19,21 @@ const int UV_PIN = 36;
 // DS3231 - Connected via I2C, G22 = SCL, G21 = SDA
 RTC_DS3231 rtc;
 
-void setup() {
-  Serial.begin(115200);
-  Serial.println("Hello World");
-}
+// Battery Pin - Connected via Analog, G25 = Battery
+const int BATTERY_PIN = 25;
 
-void loop() {}
+void setup() { Serial.begin(115200); }
+
+void loop() {
+  // int uv_index_value = get_uv_index_value(UV_PIN);
+  // std::string uv_index = get_uv_index(uv_index_value);
+  // Serial.print("UV Index: ");
+  // Serial.print(uv_index.c_str());
+  // Serial.print(" (");
+  // Serial.print(uv_index_value);
+  // Serial.print(")");
+
+  // Serial.print("Analog Read: ");
+  // Serial.println(analogRead(UV_PIN));
+  delay(1000);
+}

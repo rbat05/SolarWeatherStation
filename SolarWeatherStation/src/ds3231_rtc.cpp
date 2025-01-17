@@ -1,35 +1,29 @@
 #include "ds3231_rtc.hpp"
 #define SENSOR_ADDR 0x68
+// RTC_DS3231 rtc;
 
-void ds3231_setup(RTC_DS3231 rtc) {
-  bool status = rtc.begin();
+char daysOfTheWeek[7][12] = {"Sunday",   "Monday", "Tuesday", "Wednesday",
+                             "Thursday", "Friday", "Saturday"};
 
-  if (status == true) {
-    Serial.printf("DS3231 RTC is connected @0x%X!\n", SENSOR_ADDR);
+// Checks if the DS3231 sensor is connected
+void setup_rtc(RTC_DS3231 &rtc) {
+  Serial.begin(115200);
 
-    // Set the initial date and time
-    // rtc.adjust(DateTime(__DATE__, __TIME__));
-
-    return;
-  } else {
-    Serial.println("DS3231 RTC is not connected, check wiring or reset.");
-    while (1);
+  if (!rtc.begin()) {
+    Serial.println("Couldn't find RTC");
+    Serial.flush();
+    while (1) delay(10);
   }
 }
 
-std::string ds3231_get_timestamp(RTC_DS3231 rtc) {
+// Prints the current date and time
+String get_timestamp(RTC_DS3231 &rtc) {
   DateTime now = rtc.now();
-  // Format: HH:MM:SS - DD/MM/YYYY
-  char timestamp[21];
-  sprintf(timestamp, "%02d:%02d:%02d - %02d/%02d/%04d", now.hour(),
-          now.minute(), now.second(), now.day(), now.month(), now.year());
-  return timestamp;
+
+  char dateTime[33];
+  sprintf(dateTime, "%s %02d/%02d/%04d - %02d:%02d:%02d",
+          daysOfTheWeek[now.dayOfTheWeek()], now.day(), now.month(), now.year(),
+          now.hour(), now.minute(), now.second());
+
+  return String(dateTime);
 }
-
-// void printTwoDigits(int number) {
-//   if (number < 10) {
-//     Serial.print("0");  // Add a leading zero for single-digit numbers
-//   }
-
-//   Serial.print(number);
-// }

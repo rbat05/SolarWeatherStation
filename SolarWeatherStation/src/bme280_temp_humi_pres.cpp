@@ -5,7 +5,7 @@
 // If connected, the program will continue
 // If not, the program will be stuck in an infinite loop until the sensor is
 // connected or ESP is reset
-void bme280_setup(Adafruit_BME280 bme280) {
+void bme280_setup(Adafruit_BME280 &bme280) {
   bool status = bme280.begin(SENSOR_ADDR);
 
   if (status == true) {
@@ -18,17 +18,17 @@ void bme280_setup(Adafruit_BME280 bme280) {
 }
 
 // Returns the temperature in Celsius
-int bme280_get_temperature(Adafruit_BME280 bme280) {
+int bme280_get_temperature(Adafruit_BME280 &bme280) {
   return bme280.readTemperature();
 }
 
 // Returns the humidity in Percentage
-int bme280_get_humidity(Adafruit_BME280 bme280) {
+int bme280_get_humidity(Adafruit_BME280 &bme280) {
   return bme280.readHumidity();
 }
 
 // Returns the pressure in hPa
-int bme280_get_pressure(Adafruit_BME280 bme280) {
+int bme280_get_pressure(Adafruit_BME280 &bme280) {
   return bme280.readPressure();
 }
 

@@ -5,9 +5,6 @@
 #include <Wire.h>
 #include <string.h>
 
-// Checks if the BME280 sensor is connected
-void ds3231_setup(RTC_DS3231 rtc);
-// Returns the current timestamp
-std::string ds3231_get_timestamp(RTC_DS3231 rtc);
-
+void setup_rtc(RTC_DS3231 &rtc);
+String get_timestamp(RTC_DS3231 &rtc);
 #endif
