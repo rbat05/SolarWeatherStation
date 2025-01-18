@@ -14,10 +14,11 @@ struct BatteryInfo {
 BatteryInfo get_battery_info(int battery_pin);
 void esp32_modem_sleep();
 void esp32_modem_wake();
-void esp32_wifi_start();
-void esp32_wifi_stop();
 void esp32_deep_sleep(int seconds);
 void esp32_clock_speed_change(int freq);
 void I2C_Scan();
+
+// Need to implement ESPNOW -
+// https://randomnerdtutorials.com/esp-now-esp32-arduino-ide/
 
 #endif

@@ -24,17 +24,6 @@ void esp32_modem_wake() {
   btStart();
 }
 
-void esp32_wifi_start() {
-  WiFi.mode(WIFI_STA);
-  esp_wifi_start();
-}
-
-void esp32_wifi_stop() {
-  WiFi.disconnect(true);
-  WiFi.mode(WIFI_OFF);
-  esp_wifi_stop();
-}
-
 void esp32_deep_sleep(int seconds) {
   esp_sleep_enable_timer_wakeup(seconds * 1000000);
   esp_deep_sleep_start();

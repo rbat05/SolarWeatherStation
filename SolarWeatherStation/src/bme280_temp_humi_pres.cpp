@@ -17,19 +17,40 @@ void bme280_setup(Adafruit_BME280 &bme280) {
   }
 }
 
-// Returns the temperature in Celsius
-int bme280_get_temperature(Adafruit_BME280 &bme280) {
-  return bme280.readTemperature();
+// Returns the temperature in Celsius after sampling 100 times
+float bme280_get_temperature(Adafruit_BME280 &bme280) {
+  float rolling_sum = 0.0;
+  float average = 0.0;
+  for (int i = 0; i < 100; i++) {
+    rolling_sum += bme280.readTemperature();
+    delay(10);
+  }
+  average = rolling_sum / 100.0;
+  return average;
 }
 
-// Returns the humidity in Percentage
-int bme280_get_humidity(Adafruit_BME280 &bme280) {
-  return bme280.readHumidity();
+// Returns the humidity in Percentage after sampling 100 times
+float bme280_get_humidity(Adafruit_BME280 &bme280) {
+  float rolling_sum = 0.0;
+  float average = 0.0;
+  for (int i = 0; i < 100; i++) {
+    rolling_sum += bme280.readHumidity();
+    delay(10);
+  }
+  average = rolling_sum / 100.0;
+  return average;
 }
 
-// Returns the pressure in hPa
-int bme280_get_pressure(Adafruit_BME280 &bme280) {
-  return bme280.readPressure();
+// Returns the pressure in hPa after sampling 100 times
+float bme280_get_pressure(Adafruit_BME280 &bme280) {
+  float rolling_sum = 0.0;
+  float average = 0.0;
+  for (int i = 0; i < 100; i++) {
+    rolling_sum += bme280.readPressure();
+    delay(10);
+  }
+  average = rolling_sum / 100.0;
+  return average;
 }
 
 // Changes the sensor mode to sleep mode
