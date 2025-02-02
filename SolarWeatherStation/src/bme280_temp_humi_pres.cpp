@@ -49,7 +49,7 @@ float bme280_get_pressure(Adafruit_BME280 &bme280) {
     rolling_sum += bme280.readPressure();
     delay(10);
   }
-  average = rolling_sum / 100.0;
+  average = rolling_sum / 10000.0;
   return average;
 }
 
@@ -62,9 +62,9 @@ void bme280_sleep_mode() {
 }
 
 // Changes the sensor mode to normal mode
-void bme280_normal_mode() {
+void bme280_forced_mode() {
   Wire.beginTransmission(SENSOR_ADDR);
   Wire.write((uint8_t)0xF4);  // Selecting the control measurement register
-  Wire.write((uint8_t)0b00000011);  // Setting the sensor mode to normal mode
+  Wire.write((uint8_t)0b00100101);  // Setting the sensor mode to normal mode
   Wire.endTransmission();
 }

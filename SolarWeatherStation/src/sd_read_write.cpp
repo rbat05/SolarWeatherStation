@@ -39,8 +39,8 @@ bool sd_get_info() {
 }
 
 // Write in .csv format, in file named "weather_data.csv"
-// Line format: date_time, temperature, humidity, pressure, uv_index,
-// wind_speed, wind_direction
+// Line format: date_time, temperature, humidity, pressure, uv_index_int,
+// uv_index_str, wind_speed, wind_direction
 void sd_write_weather_data(WeatherData data) {
   // Check if the SD card is available
   // then, print out sd card info to serial
@@ -63,8 +63,8 @@ void sd_write_weather_data(WeatherData data) {
       String formatted_data =
           data.date_time + "," + String(data.temperature) + "," +
           String(data.humidity) + "," + String(data.pressure) + "," +
-          String(data.uv_index) + "," + String(data.wind_speed) + "," +
-          data.wind_direction;
+          String(data.uv_index_int) + "," + data.uv_index_str + "," +
+          String(data.wind_speed) + "," + data.wind_direction;
       Serial.println("Writing following data to weather_data.csv:");
       Serial.println(formatted_data);
       myfile.println(formatted_data);

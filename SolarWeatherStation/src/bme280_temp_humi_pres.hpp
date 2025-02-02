@@ -15,6 +15,6 @@ float bme280_get_pressure(Adafruit_BME280 &bme280);
 
 // Change sensor mode
 void bme280_sleep_mode();
-void bme280_normal_mode();
+void bme280_forced_mode();
 
 #endif

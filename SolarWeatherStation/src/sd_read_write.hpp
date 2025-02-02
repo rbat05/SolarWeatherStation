@@ -11,7 +11,8 @@ struct WeatherData {
   float pressure;
   float wind_speed;
   String wind_direction;
-  int uv_index;
+  int uv_index_int;
+  String uv_index_str;
   String date_time;
 };
 

@@ -1,10 +1,14 @@
 #include "utilities.hpp"
 
+#include <Arduino.h>
+
 BatteryInfo get_battery_info(int battery_pin) {
   BatteryInfo result;
   float batLiPo = analogReadMilliVolts(25);
-  float batVoltage = batLiPo / 0.652;
-  float batPercentage = batVoltage / 4.2 * 100;
+  float batVoltage = (batLiPo / 0.652) / 1000;
+  float batPercentage = (batVoltage / 4.2) * 100;
+
+  batPercentage = min(round(batPercentage), static_cast<float>(100.0));
 
   result.voltage = batVoltage;
   result.percentage = batPercentage;
@@ -16,6 +20,7 @@ void esp32_modem_sleep() {
   esp_wifi_stop();
   esp_bt_controller_disable();
   btStop();
+  WiFi.mode(WIFI_OFF);
 }
 
 void esp32_modem_wake() {
@@ -26,6 +31,7 @@ void esp32_modem_wake() {
 
 void esp32_deep_sleep(int seconds) {
   esp_sleep_enable_timer_wakeup(seconds * 1000000);
+  Serial.println("Entering deep sleep for " + String(seconds) + " seconds.");
   esp_deep_sleep_start();
 }
 
@@ -64,8 +70,7 @@ void esp32_clock_speed_change(int freq) {
 }
 
 void I2C_Scan() {
-  Wire.begin();         /*I2C Communication begins*/
-  Serial.begin(115200); /*Baud Rate defined for serial communication*/
+  Wire.begin();                    /*I2C Communication begins*/
   Serial.println("\nI2C Scanner"); /*print scanner on serial monitor*/
   for (int i = 0; i < 10; i++) {
     byte error, address;
@@ -102,5 +107,32 @@ void I2C_Scan() {
       Serial.println("done\n");
     }
     delay(5000); /*Delay given for checking I2C bus every 5 sec*/
+  }
+}
+
+void print_wakeup_reason() {
+  esp_sleep_wakeup_cause_t wakeup_reason;
+
+  wakeup_reason = esp_sleep_get_wakeup_cause();
+
+  switch (wakeup_reason) {
+    case ESP_SLEEP_WAKEUP_EXT0:
+      Serial.println("Wakeup caused by external signal using RTC_IO");
+      break;
+    case ESP_SLEEP_WAKEUP_EXT1:
+      Serial.println("Wakeup caused by external signal using RTC_CNTL");
+      break;
+    case ESP_SLEEP_WAKEUP_TIMER:
+      Serial.println("Wakeup caused by timer");
+      break;
+    case ESP_SLEEP_WAKEUP_TOUCHPAD:
+      Serial.println("Wakeup caused by touchpad");
+      break;
+    case ESP_SLEEP_WAKEUP_ULP:
+      Serial.println("Wakeup caused by ULP program");
+      break;
+    default:
+      Serial.printf("Wakeup was not caused by deep sleep: %d\n", wakeup_reason);
+      break;
   }
 }
