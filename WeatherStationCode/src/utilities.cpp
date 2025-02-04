@@ -4,7 +4,12 @@
 
 BatteryInfo get_battery_info(int battery_pin) {
   BatteryInfo result;
-  float batLiPo = analogReadMilliVolts(25);
+  float rolling_total = 0.0;
+  for (int i = 0; i < 100; i++) {
+    rolling_total += analogReadMilliVolts(25);
+  }
+
+  float batLiPo = rolling_total / 100;
   float batVoltage = (batLiPo / 0.652) / 1000;
   float batPercentage = (batVoltage / 4.2) * 100;
 

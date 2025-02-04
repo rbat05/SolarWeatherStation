@@ -2,8 +2,7 @@
 #define SENSOR_ADDR 0x68
 // RTC_DS3231 rtc;
 
-char daysOfTheWeek[7][12] = {"Sunday",   "Monday", "Tuesday", "Wednesday",
-                             "Thursday", "Friday", "Saturday"};
+char daysOfTheWeek[7][12] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
 
 // Checks if the DS3231 sensor is connected
 void setup_rtc(RTC_DS3231 &rtc) {
