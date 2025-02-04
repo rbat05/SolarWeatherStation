@@ -11,13 +11,13 @@ struct BatteryInfo {
   float percentage;
 };
 
-BatteryInfo get_battery_info(int battery_pin);
-void esp32_modem_sleep();
-void esp32_modem_wake();
-void esp32_deep_sleep(int seconds);
-void esp32_clock_speed_change(int freq);
-void I2C_Scan();
-void print_wakeup_reason();
+BatteryInfo getBatteryInfo(int battery_pin);
+void esp32ModemSleep();
+void esp32ModemWake();
+void esp32DeepSleep(int seconds);
+void esp32ClockSpeedChange(int freq);
+void I2CScan();
+void printWakeupReason();
 
 // Need to implement ESPNOW -
 // https://randomnerdtutorials.com/esp-now-esp32-arduino-ide/

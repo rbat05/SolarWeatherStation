@@ -2,24 +2,24 @@
 
 char daysOfTheWeek[7][12] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
 
-void setup_ds3231(RTC_DS3231 &rtc) {
+void setupDS3231(RTC_DS3231 &rtc) {
   if (!rtc.begin()) {
     Serial.println("Couldn't find RTC");
     while (1);
   }
 }
 
-String get_day_date(RTC_DS3231 &rtc) {
+String getDayDate(RTC_DS3231 &rtc) {
   DateTime now = rtc.now();
 
-  char day_date[33];
-  sprintf(day_date, "%s %02d/%02d/%04d", daysOfTheWeek[now.dayOfTheWeek()],
+  char dayDate[33];
+  sprintf(dayDate, "%s %02d/%02d/%04d", daysOfTheWeek[now.dayOfTheWeek()],
           now.day(), now.month(), now.year());
 
-  return String(day_date);
+  return String(dayDate);
 }
 
-String get_time(RTC_DS3231 &rtc) {
+String getTime(RTC_DS3231 &rtc) {
   DateTime now = rtc.now();
 
   char time[15];

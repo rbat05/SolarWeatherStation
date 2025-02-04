@@ -3,7 +3,7 @@
 String LAST_LINE_WEATHER_DATA;
 String LAST_LINE_DIAGNOSTICS;
 
-void sd_read_setup() {
+void sdReadSetup() {
   // SD Card
   Serial.print("Initializing SD card...");
 
@@ -16,7 +16,7 @@ void sd_read_setup() {
 
 // No other way to do this, library does not support reverse reading nor seek
 // functions
-void sd_read_get_last_line() {
+void sdReadGetLastLine() {
   File myFile;
   myFile = SD.open("weather_data.csv", FILE_READ);
   if (myFile) {
@@ -63,9 +63,9 @@ void sd_read_get_last_line() {
   }
 }
 
-LatestReadings sd_read_get_latest_readings(LatestReadings &latest_readings) {
+LatestReadings sdReadGetLatestReadings(LatestReadings &latest_readings) {
   // Weather Data
-  latest_readings.day_date = LAST_LINE_WEATHER_DATA.substring(
+  latest_readings.dayDate = LAST_LINE_WEATHER_DATA.substring(
       0, LAST_LINE_WEATHER_DATA.indexOf('-') - 1);
   latest_readings.time =
       LAST_LINE_WEATHER_DATA.substring(LAST_LINE_WEATHER_DATA.indexOf('-') + 2,
@@ -92,24 +92,24 @@ LatestReadings sd_read_get_latest_readings(LatestReadings &latest_readings) {
   LAST_LINE_WEATHER_DATA =
       LAST_LINE_WEATHER_DATA.substring(LAST_LINE_WEATHER_DATA.indexOf(',') + 1);
 
-  latest_readings.uv_index =
+  latest_readings.uvIndex =
       LAST_LINE_WEATHER_DATA.substring(0, LAST_LINE_WEATHER_DATA.indexOf(','))
           .toInt();
   LAST_LINE_WEATHER_DATA =
       LAST_LINE_WEATHER_DATA.substring(LAST_LINE_WEATHER_DATA.indexOf(',') + 1);
 
-  latest_readings.uv_index_str =
+  latest_readings.uvIndexStr =
       LAST_LINE_WEATHER_DATA.substring(0, LAST_LINE_WEATHER_DATA.indexOf(','));
   LAST_LINE_WEATHER_DATA =
       LAST_LINE_WEATHER_DATA.substring(LAST_LINE_WEATHER_DATA.indexOf(',') + 1);
 
-  latest_readings.wind_speed =
+  latest_readings.windSpeed =
       LAST_LINE_WEATHER_DATA.substring(0, LAST_LINE_WEATHER_DATA.indexOf(','))
           .toFloat();
   LAST_LINE_WEATHER_DATA =
       LAST_LINE_WEATHER_DATA.substring(LAST_LINE_WEATHER_DATA.indexOf(',') + 1);
 
-  latest_readings.wind_direction = LAST_LINE_WEATHER_DATA;
+  latest_readings.windDirection = LAST_LINE_WEATHER_DATA;
 
   // Diagnostics
   // Skip the first two values
@@ -119,7 +119,7 @@ LatestReadings sd_read_get_latest_readings(LatestReadings &latest_readings) {
       LAST_LINE_DIAGNOSTICS.substring(LAST_LINE_DIAGNOSTICS.indexOf(',') + 1);
 
   // Extract the battery percentage value
-  latest_readings.battery_percentage =
+  latest_readings.batteryPercentage =
       LAST_LINE_DIAGNOSTICS.substring(0, LAST_LINE_DIAGNOSTICS.indexOf(','))
           .toFloat();
 

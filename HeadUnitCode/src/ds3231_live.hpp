@@ -3,8 +3,8 @@
 
 #include "RTClib.h"
 
-void setup_ds3231(RTC_DS3231 &rtc);
-String get_day_date(RTC_DS3231 &rtc);
-String get_time(RTC_DS3231 &rtc);
+void setupDS3231(RTC_DS3231 &rtc);
+String getDayDate(RTC_DS3231 &rtc);
+String getTime(RTC_DS3231 &rtc);
 
 #endif

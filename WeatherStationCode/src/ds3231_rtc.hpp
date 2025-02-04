@@ -5,6 +5,6 @@
 #include <Wire.h>
 #include <string.h>
 
-void setup_rtc(RTC_DS3231 &rtc);
-String get_timestamp(RTC_DS3231 &rtc);
+void setupRTC(RTC_DS3231 &rtc);
+String getTimestamp(RTC_DS3231 &rtc);
 #endif

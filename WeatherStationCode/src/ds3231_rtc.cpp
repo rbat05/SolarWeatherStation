@@ -5,7 +5,7 @@
 char daysOfTheWeek[7][12] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
 
 // Checks if the DS3231 sensor is connected
-void setup_rtc(RTC_DS3231 &rtc) {
+void setupRTC(RTC_DS3231 &rtc) {
   if (!rtc.begin()) {
     Serial.println("Couldn't find RTC.");
     Serial.flush();
@@ -15,7 +15,7 @@ void setup_rtc(RTC_DS3231 &rtc) {
 }
 
 // Prints the current date and time
-String get_timestamp(RTC_DS3231 &rtc) {
+String getTimestamp(RTC_DS3231 &rtc) {
   DateTime now = rtc.now();
 
   char dateTime[33];

@@ -5,7 +5,7 @@
 // If connected, the program will continue
 // If not, the program will be stuck in an infinite loop until the sensor is
 // connected or ESP is reset
-void bme280_setup(Adafruit_BME280 &bme280) {
+void bme280Setup(Adafruit_BME280 &bme280) {
   bool status = bme280.begin(SENSOR_ADDR);
 
   if (status == true) {
@@ -18,43 +18,43 @@ void bme280_setup(Adafruit_BME280 &bme280) {
 }
 
 // Returns the temperature in Celsius after sampling 100 times
-float bme280_get_temperature(Adafruit_BME280 &bme280) {
-  float rolling_sum = 0.0;
+float bme280GetTemperature(Adafruit_BME280 &bme280) {
+  float rollingSum = 0.0;
   float average = 0.0;
   for (int i = 0; i < 100; i++) {
-    rolling_sum += bme280.readTemperature();
+    rollingSum += bme280.readTemperature();
     delay(10);
   }
-  average = rolling_sum / 100.0;
+  average = rollingSum / 100.0;
   return average;
 }
 
 // Returns the humidity in Percentage after sampling 100 times
-float bme280_get_humidity(Adafruit_BME280 &bme280) {
-  float rolling_sum = 0.0;
+float bme280GetHumidity(Adafruit_BME280 &bme280) {
+  float rollingSum = 0.0;
   float average = 0.0;
   for (int i = 0; i < 100; i++) {
-    rolling_sum += bme280.readHumidity();
+    rollingSum += bme280.readHumidity();
     delay(10);
   }
-  average = rolling_sum / 100.0;
+  average = rollingSum / 100.0;
   return average;
 }
 
 // Returns the pressure in hPa after sampling 100 times
-float bme280_get_pressure(Adafruit_BME280 &bme280) {
-  float rolling_sum = 0.0;
+float bme280GetPressure(Adafruit_BME280 &bme280) {
+  float rollingSum = 0.0;
   float average = 0.0;
   for (int i = 0; i < 100; i++) {
-    rolling_sum += bme280.readPressure();
+    rollingSum += bme280.readPressure();
     delay(10);
   }
-  average = rolling_sum / 10000.0;
+  average = rollingSum / 10000.0;
   return average;
 }
 
 // Changes the sensor mode to sleep mode
-void bme280_sleep_mode() {
+void bme280SleepMode() {
   Wire.beginTransmission(SENSOR_ADDR);
   Wire.write((uint8_t)0xF4);  // Selecting the control measurement register
   Wire.write((uint8_t)0b00000000);  // Setting the sensor mode to sleep mode
@@ -62,7 +62,7 @@ void bme280_sleep_mode() {
 }
 
 // Changes the sensor mode to normal mode
-void bme280_forced_mode() {
+void bme280ForcedMode() {
   Wire.beginTransmission(SENSOR_ADDR);
   Wire.write((uint8_t)0xF4);  // Selecting the control measurement register
   Wire.write((uint8_t)0b00100101);  // Setting the sensor mode to normal mode

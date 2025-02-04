@@ -22,36 +22,36 @@ void setup() {
   Serial.begin(115200);
 
   // SSD1306 Display
-  ssd1306_display_setup(display);
+  ssd1306DisplaySetup(display);
 
-  setup_ds3231(rtc);
+  setupDS3231(rtc);
 
-  sd_read_setup();
-  sd_read_get_last_line();
-  sd_read_get_latest_readings(latest_readings);
+  sdReadSetup();
+  sdReadGetLastLine();
+  sdReadGetLatestReadings(latest_readings);
 
   Serial.println("Setup complete.");
   // Serial.println("Temperature: " + String(latest_readings.temperature));
   // Serial.println("Humidity: " + String(latest_readings.humidity));
   // Serial.println("Pressure: " + String(latest_readings.pressure));
-  // Serial.println("UV Index: " + String(latest_readings.uv_index));
-  // Serial.println("UV Index Str: " + latest_readings.uv_index_str);
-  // Serial.println("Wind Speed: " + String(latest_readings.wind_speed));
-  // Serial.println("Wind Direction: " + latest_readings.wind_direction);
+  // Serial.println("UV Index: " + String(latest_readings.uvIndex));
+  // Serial.println("UV Index Str: " + latest_readings.uvIndexStr);
+  // Serial.println("Wind Speed: " + String(latest_readings.windSpeed));
+  // Serial.println("Wind Direction: " + latest_readings.windDirection);
   // Serial.println("Battery Percentage: " +
-  //                String(latest_readings.battery_percentage));
-  // Serial.println("Day Date: " + latest_readings.day_date);
+  //                String(latest_readings.batteryPercentage));
+  // Serial.println("Day Date: " + latest_readings.dayDate);
   // Serial.println("Time: " + latest_readings.time);
 }
 
 void loop() {
   // Display live time and latest weather data for 5 seconds
-  ssd1306_display_clear(display);
+  ssd1306DisplayClear(display);
 
   for (int i = 0; i < 10; i++) {
-    // ssd1306_display_clear(display);
-    String day_date = get_day_date(rtc);
-    String time = get_time(rtc);
+    // ssd1306DisplayClear(display);
+    String dayDate = getDayDate(rtc);
+    String time = getTime(rtc);
 
     // Refreshes the time section of the display only (ie line 2)
     int x, y;
@@ -61,18 +61,18 @@ void loop() {
       }
     }
 
-    ssd1306_display_live_time(display, day_date, time);
-    ssd1306_display_weather_data(
+    ssd1306DisplayLiveTime(display, dayDate, time);
+    ssd1306DisplayWeatherData(
         display, latest_readings.temperature, latest_readings.humidity,
-        latest_readings.pressure, latest_readings.uv_index,
-        latest_readings.uv_index_str, latest_readings.wind_speed,
-        latest_readings.wind_direction);
+        latest_readings.pressure, latest_readings.uvIndex,
+        latest_readings.uvIndexStr, latest_readings.windSpeed,
+        latest_readings.windDirection);
     delay(1000);
   }
 
   // Display diagnostic information for 3 seconds and then reset
-  ssd1306_display_diagnostic(display, latest_readings.battery_percentage,
-                             latest_readings.day_date, latest_readings.time);
+  ssd1306DisplayDiagnostic(display, latest_readings.batteryPercentage,
+                           latest_readings.dayDate, latest_readings.time);
   delay(3000);
 }
 

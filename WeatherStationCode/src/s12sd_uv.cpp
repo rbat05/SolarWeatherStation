@@ -1,86 +1,86 @@
 #include "s12sd_uv.hpp"
 
 // BROKEN REWRITE
-int get_uv_index_value(int uv_pin) {
-  float sensor_voltage = analogReadMilliVolts(uv_pin);
-  int uv_index_value = 0;
-  Serial.println(sensor_voltage);
+int getUVIndexValue(int uv_pin) {
+  float sensorVoltage = analogReadMilliVolts(uv_pin);
+  int uvIndexValue = 0;
+  Serial.println(sensorVoltage);
   return 0;
 
-  // if (sensor_voltage < 0.05)
-  //   uv_index_value = 0;  // LOW
-  // else if (sensor_voltage > 0.05 && sensor_voltage <= 0.227)
-  //   uv_index_value = 1;  // LOW
-  // else if (sensor_voltage > 0.227 && sensor_voltage <= 0.318)
-  //   uv_index_value = 2;  // LOW
-  // else if (sensor_voltage > 0.318 && sensor_voltage <= 0.408)
-  //   uv_index_value = 3;  // MODERATE
-  // else if (sensor_voltage > 0.408 && sensor_voltage <= 0.503)
-  //   uv_index_value = 4;  // MODERATE
-  // else if (sensor_voltage > 0.503 && sensor_voltage <= 0.606)
-  //   uv_index_value = 5;  // MODERATE
-  // else if (sensor_voltage > 0.606 && sensor_voltage <= 0.696)
-  //   uv_index_value = 6;  // HIGH
-  // else if (sensor_voltage > 0.696 && sensor_voltage <= 0.795)
-  //   uv_index_value = 7;  // HIGH
-  // else if (sensor_voltage > 0.795 && sensor_voltage <= 0.881)
-  //   uv_index_value = 8;  // VERY HIGH
-  // else if (sensor_voltage > 0.881 && sensor_voltage <= 0.976)
-  //   uv_index_value = 9;  // VERY HIGH
-  // else if (sensor_voltage > 0.976 && sensor_voltage <= 1.079)
-  //   uv_index_value = 10;  // VERY HIGH
-  // else if (sensor_voltage > 1.079 && sensor_voltage <= 1.170)
-  //   uv_index_value = 11;  // EXTREME
+  // if (sensorVoltage < 0.05)
+  //   uvIndexValue = 0;  // LOW
+  // else if (sensorVoltage > 0.05 && sensorVoltage <= 0.227)
+  //   uvIndexValue = 1;  // LOW
+  // else if (sensorVoltage > 0.227 && sensorVoltage <= 0.318)
+  //   uvIndexValue = 2;  // LOW
+  // else if (sensorVoltage > 0.318 && sensorVoltage <= 0.408)
+  //   uvIndexValue = 3;  // MODERATE
+  // else if (sensorVoltage > 0.408 && sensorVoltage <= 0.503)
+  //   uvIndexValue = 4;  // MODERATE
+  // else if (sensorVoltage > 0.503 && sensorVoltage <= 0.606)
+  //   uvIndexValue = 5;  // MODERATE
+  // else if (sensorVoltage > 0.606 && sensorVoltage <= 0.696)
+  //   uvIndexValue = 6;  // HIGH
+  // else if (sensorVoltage > 0.696 && sensorVoltage <= 0.795)
+  //   uvIndexValue = 7;  // HIGH
+  // else if (sensorVoltage > 0.795 && sensorVoltage <= 0.881)
+  //   uvIndexValue = 8;  // VERY HIGH
+  // else if (sensorVoltage > 0.881 && sensorVoltage <= 0.976)
+  //   uvIndexValue = 9;  // VERY HIGH
+  // else if (sensorVoltage > 0.976 && sensorVoltage <= 1.079)
+  //   uvIndexValue = 10;  // VERY HIGH
+  // else if (sensorVoltage > 1.079 && sensorVoltage <= 1.170)
+  //   uvIndexValue = 11;  // EXTREME
   // else
-  //   uv_index_value = -1;  // INVALID
+  //   uvIndexValue = -1;  // INVALID
 
-  // return uv_index_value;
+  // return uvIndexValue;
 }
 
-String get_uv_index(int uv_index_value) {
-  String uv_index = "";
+String getUVIndex(int uvIndexValue) {
+  String uvIndex = "";
 
-  switch (uv_index_value) {
+  switch (uvIndexValue) {
     case 0:
-      uv_index = "LOW";
+      uvIndex = "LOW";
       break;
     case 1:
-      uv_index = "LOW";
+      uvIndex = "LOW";
       break;
     case 2:
-      uv_index = "LOW";
+      uvIndex = "LOW";
       break;
     case 3:
-      uv_index = "MODERATE";
+      uvIndex = "MODERATE";
       break;
     case 4:
-      uv_index = "MODERATE";
+      uvIndex = "MODERATE";
       break;
     case 5:
-      uv_index = "MODERATE";
+      uvIndex = "MODERATE";
       break;
     case 6:
-      uv_index = "HIGH";
+      uvIndex = "HIGH";
       break;
     case 7:
-      uv_index = "HIGH";
+      uvIndex = "HIGH";
       break;
     case 8:
-      uv_index = "VERY HIGH";
+      uvIndex = "VERY HIGH";
       break;
     case 9:
-      uv_index = "VERY HIGH";
+      uvIndex = "VERY HIGH";
       break;
     case 10:
-      uv_index = "VERY HIGH";
+      uvIndex = "VERY HIGH";
       break;
     case 11:
-      uv_index = "EXTREME";
+      uvIndex = "EXTREME";
       break;
     default:
-      uv_index = "INVALID";
+      uvIndex = "INVALID";
       break;
   }
 
-  return uv_index;
+  return uvIndex;
 }

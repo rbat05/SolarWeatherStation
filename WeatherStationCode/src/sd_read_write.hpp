@@ -9,30 +9,30 @@ struct WeatherData {
   float temperature;
   float humidity;
   float pressure;
-  float wind_speed;
-  String wind_direction;
-  int uv_index_int;
-  String uv_index_str;
-  String date_time;
+  float windSpeed;
+  String windDirection;
+  int uvIndexInt;
+  String uvIndexStr;
+  String dateTime;
 };
 
 // Diagnostics Data
 struct Diagnostics {
-  uint8_t bme280_address;
-  uint8_t ds3231_address;
-  float uv_sensor_reading;
-  float north_49e_reading;
-  float south_49e_reading;
-  float east_49e_reading;
-  float west_49e_reading;
-  float tach_49e_reading;
-  float battery_voltage;
-  float battery_percentage;
-  String date_time;
+  uint8_t bme280Address;
+  uint8_t ds3231Address;
+  float uvSensorReading;
+  float north49eReading;
+  float south49eReading;
+  float east49eReading;
+  float west49eReading;
+  float tach49eReading;
+  float batteryVoltage;
+  float batteryPercentage;
+  String dateTime;
 };
 
-bool sd_get_info();
-void sd_write_weather_data(WeatherData data);
-void sd_write_diagnostics(Diagnostics data);
+bool sdGetInfo();
+void sdWriteWeatherData(WeatherData data);
+void sdWriteDiagnostics(Diagnostics data);
 
 #endif

@@ -2,14 +2,14 @@
 
 #include <Arduino.h>
 
-BatteryInfo get_battery_info(int battery_pin) {
+BatteryInfo getBatteryInfo(int battery_pin) {
   BatteryInfo result;
-  float rolling_total = 0.0;
+  float rollingTotal = 0.0;
   for (int i = 0; i < 100; i++) {
-    rolling_total += analogReadMilliVolts(25);
+    rollingTotal += analogReadMilliVolts(25);
   }
 
-  float batLiPo = rolling_total / 100;
+  float batLiPo = rollingTotal / 100;
   float batVoltage = (batLiPo / 0.652) / 1000;
   float batPercentage = (batVoltage / 4.2) * 100;
 
@@ -21,27 +21,27 @@ BatteryInfo get_battery_info(int battery_pin) {
   return result;
 }
 
-void esp32_modem_sleep() {
+void esp32ModemSleep() {
   esp_wifi_stop();
   esp_bt_controller_disable();
   btStop();
   WiFi.mode(WIFI_OFF);
 }
 
-void esp32_modem_wake() {
+void esp32ModemWake() {
   esp_wifi_start();
   esp_bt_controller_enable(ESP_BT_MODE_CLASSIC_BT);
   btStart();
 }
 
-void esp32_deep_sleep(int seconds) {
+void esp32DeepSleep(int seconds) {
   esp_sleep_enable_timer_wakeup(seconds * 1000000);
   Serial.println("Entering deep sleep for " + String(seconds) + " seconds.");
   esp_deep_sleep_start();
 }
 
 // 80 is good enough for sensors
-void esp32_clock_speed_change(int freq) {
+void esp32ClockSpeedChange(int freq) {
   switch (freq) {
     case 240:
       setCpuFrequencyMhz(240);
@@ -74,7 +74,7 @@ void esp32_clock_speed_change(int freq) {
   }
 }
 
-void I2C_Scan() {
+void I2CScan() {
   Wire.begin();                    /*I2C Communication begins*/
   Serial.println("\nI2C Scanner"); /*print scanner on serial monitor*/
   for (int i = 0; i < 10; i++) {
@@ -115,7 +115,7 @@ void I2C_Scan() {
   }
 }
 
-void print_wakeup_reason() {
+void printWakeupReason() {
   esp_sleep_wakeup_cause_t wakeup_reason;
 
   wakeup_reason = esp_sleep_get_wakeup_cause();

@@ -8,20 +8,20 @@
 #define SD_CS_PIN 8
 
 struct LatestReadings {
-  String day_date;
+  String dayDate;
   String time;
   float temperature;
   float humidity;
   float pressure;
-  int uv_index;
-  String uv_index_str;
-  float wind_speed;
-  String wind_direction;
-  float battery_percentage;
+  int uvIndex;
+  String uvIndexStr;
+  float windSpeed;
+  String windDirection;
+  float batteryPercentage;
 };
 
-void sd_read_setup();
-void sd_read_get_last_line();
-LatestReadings sd_read_get_latest_readings(LatestReadings &latest_readings);
+void sdReadSetup();
+void sdReadGetLastLine();
+LatestReadings sdReadGetLatestReadings(LatestReadings &latest_readings);
 
 #endif

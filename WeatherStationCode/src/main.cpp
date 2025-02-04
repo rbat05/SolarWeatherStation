@@ -36,76 +36,76 @@ const int PIN_49E_TACH = 33;
 
 void setup() {
   Serial.begin(115200);
-  print_wakeup_reason();
-  bme280_setup(bme280);
-  setup_rtc(rtc);
+  printWakeupReason();
+  bme280Setup(bme280);
+  setupRTC(rtc);
 
-  esp32_modem_sleep();
-  bme280_forced_mode();
-  esp32_clock_speed_change(80);
+  esp32ModemSleep();
+  bme280ForcedMode();
+  esp32ClockSpeedChange(80);
 
-  float temperature = bme280_get_temperature(bme280);
-  float humidity = bme280_get_humidity(bme280);
-  float pressure = bme280_get_pressure(bme280);
+  float temperature = bme280GetTemperature(bme280);
+  float humidity = bme280GetHumidity(bme280);
+  float pressure = bme280GetPressure(bme280);
 
-  bme280_sleep_mode();
+  bme280SleepMode();
 
   Serial.print("Temperature: " + String(temperature) + "°C ");
   Serial.print("Humidity: " + String(humidity) + "% ");
   Serial.println("Pressure: " + String(pressure) + "hPa");
 
-  // int uv_index_int = get_uv_index_value(UV_PIN);
-  // String uv_index_str = get_uv_index(uv_index_int);
+  // int uvIndexInt = getUVIndexValue(UV_PIN);
+  // String uvIndexStr = getUVIndex(uvIndexInt);
 
-  int uv_index_int = 0;
-  String uv_index_str = "OFF";
+  int uvIndexInt = 0;
+  String uvIndexStr = "OFF";
 
-  String timestamp = get_timestamp(rtc);
+  String timestamp = getTimestamp(rtc);
   Serial.println("Timestamp: " + timestamp);
 
-  BatteryInfo battery_info = get_battery_info(BATTERY_PIN);
+  BatteryInfo battery_info = getBatteryInfo(BATTERY_PIN);
   Serial.print("Battery Voltage: " + String(battery_info.voltage) + "V ");
   Serial.println("Battery Percentage: " + String(battery_info.percentage) +
                  "%");
 
-  int north_49e_reading = 10;
-  int south_49e_reading = 20;
-  int east_49e_reading = 30;
-  int west_49e_reading = 40;
+  int north49eReading = 10;
+  int south49eReading = 20;
+  int east49eReading = 30;
+  int west49eReading = 40;
 
-  int tach_49e_reading = 15;
+  int tach49eReading = 15;
 
   WeatherData weather_data;
   weather_data.temperature = temperature;
   weather_data.humidity = humidity;
   weather_data.pressure = pressure;
-  weather_data.wind_speed = tach_49e_reading;
-  weather_data.wind_direction = "NORTH";
-  weather_data.uv_index_int = uv_index_int;
-  weather_data.uv_index_str = uv_index_str;
-  weather_data.date_time = timestamp;
+  weather_data.windSpeed = tach49eReading;
+  weather_data.windDirection = "NORTH";
+  weather_data.uvIndexInt = uvIndexInt;
+  weather_data.uvIndexStr = uvIndexStr;
+  weather_data.dateTime = timestamp;
 
-  sd_write_weather_data(weather_data);
+  sdWriteWeatherData(weather_data);
 
   Diagnostics diagnostics;
-  diagnostics.date_time = timestamp;
-  diagnostics.battery_voltage = battery_info.voltage;
-  diagnostics.battery_percentage = battery_info.percentage;
-  diagnostics.bme280_address = 118;
-  diagnostics.ds3231_address = 104;
-  diagnostics.uv_sensor_reading = 0;
-  diagnostics.north_49e_reading = 1.2;
-  diagnostics.south_49e_reading = 1.3;
-  diagnostics.east_49e_reading = 1.4;
-  diagnostics.west_49e_reading = 1.5;
-  diagnostics.tach_49e_reading = 1.6;
+  diagnostics.dateTime = timestamp;
+  diagnostics.batteryVoltage = battery_info.voltage;
+  diagnostics.batteryPercentage = battery_info.percentage;
+  diagnostics.bme280Address = 118;
+  diagnostics.ds3231Address = 104;
+  diagnostics.uvSensorReading = 0;
+  diagnostics.north49eReading = 1.2;
+  diagnostics.south49eReading = 1.3;
+  diagnostics.east49eReading = 1.4;
+  diagnostics.west49eReading = 1.5;
+  diagnostics.tach49eReading = 1.6;
 
-  sd_write_diagnostics(diagnostics);
+  sdWriteDiagnostics(diagnostics);
 
   Serial.println("Going to sleep now");
   Serial.flush();
   delay(1000);
-  esp32_deep_sleep(60);
+  esp32DeepSleep(60);
 }
 
 // Empty due to deep sleep
