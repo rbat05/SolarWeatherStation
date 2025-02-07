@@ -13,15 +13,13 @@ struct LatestReadings {
   float temperature;
   float humidity;
   float pressure;
-  int uvIndex;
-  String uvIndexStr;
   float windSpeed;
   String windDirection;
   float batteryPercentage;
 };
 
 void sdReadSetup();
-void sdReadGetLastLine();
+void sdReadGetLastLine(String filename);
 LatestReadings sdReadGetLatestReadings(LatestReadings &latest_readings);
 
 #endif

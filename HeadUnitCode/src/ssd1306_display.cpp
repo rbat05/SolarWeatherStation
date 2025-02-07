@@ -28,55 +28,60 @@ void ssd1306DisplayLiveTime(Adafruit_SSD1306 &display, String dayDate,
   display.display();
 }
 
-void ssd1306DisplayWeatherData(Adafruit_SSD1306 &display,
-                               float latest_temperature, float latest_humidity,
-                               float latest_pressure, int latest_uv_index,
-                               String latest_uv_index_str,
-                               float latest_wind_speed,
-                               String latest_wind_direction) {
+// Format
+// Live Day Date
+// Live Time
+// Latest Temperature
+// Latest Humidity
+// Latest Pressure
+// Latest Wind Speed & Direction
+// Latest Battery Percentage
+// Time difference between latest reading and current time
+
+void ssd1306DisplayReadings(Adafruit_SSD1306 &display, float latest_temperature,
+                            float latest_humidity, float latest_pressure,
+                            float latest_wind_speed,
+                            String latest_wind_direction,
+                            float latest_battery_percentage, int hours,
+                            int minutes, int seconds) {
   display.setCursor(0, 16);
-  display.print("Temp (");
+  display.print("Temp(");
   display.print((char)247);
   display.print("C): ");
   display.println(latest_temperature);
 
   display.setCursor(0, 24);
-  display.print("Humi (%): ");
+  display.print("Humi(%): ");
   display.println(latest_humidity);
 
   display.setCursor(0, 32);
-  display.print("Pres (hPa): ");
+  display.print("Pres(hPa): ");
   display.println(latest_pressure);
 
   display.setCursor(0, 40);
-  display.print("UVI: ");
-  display.println(latest_uv_index_str);
-
-  display.setCursor(0, 48);
-  display.print("Wind:  ");
+  display.print("Wind: ");
   display.print(latest_wind_speed);
   display.print(" km/h ");
   display.println(latest_wind_direction);
 
-  display.display();
-}
-
-void ssd1306DisplayDiagnostic(Adafruit_SSD1306 &display,
-                              float latest_battery_percentage,
-                              String latest_reading_day_date,
-                              String latest_reading_time) {
-  ssd1306DisplayClear(display);
-
-  display.setCursor(0, 0);
-  display.println("Latest reading from: ");
-  display.println(latest_reading_day_date);
-  display.setCursor(0, 16);
-  display.println(latest_reading_time);
-
-  display.setCursor(0, 24);
+  display.setCursor(0, 48);
   display.print("Battery: ");
   display.print(latest_battery_percentage);
   display.println("%");
+
+  display.setCursor(0, 56);
+
+  // Only display most significant time difference
+  if (hours > 0) {
+    display.print(hours);
+    display.print("h ago...");
+  } else if (minutes > 0) {
+    display.print(minutes);
+    display.print("m ago...");
+  } else {
+    display.print(seconds);
+    display.println("Just Now...");
+  }
 
   display.display();
 }

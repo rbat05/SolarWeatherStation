@@ -7,15 +7,12 @@
 #include "49e_wind_speed_dir.hpp"
 #include "bme280_temp_humi_pres.hpp"
 #include "ds3231_rtc.hpp"
-#include "s12sd_uv.hpp"
+#include "espNOW_send.hpp"
 #include "sd_read_write.hpp"
 #include "utilities.hpp"
 
 // BME280 - Connected via I2C, G22 = SCL, G21 = SDA
 Adafruit_BME280 bme280;
-
-// S12SD - Connected via Analog, G36 = UV
-const int UV_PIN = 36;
 
 // DS3231 - Connected via I2C, G22 = SCL, G21 = SDA
 RTC_DS3231 rtc;
@@ -54,12 +51,6 @@ void setup() {
   Serial.print("Humidity: " + String(humidity) + "% ");
   Serial.println("Pressure: " + String(pressure) + "hPa");
 
-  // int uvIndexInt = getUVIndexValue(UV_PIN);
-  // String uvIndexStr = getUVIndex(uvIndexInt);
-
-  int uvIndexInt = 0;
-  String uvIndexStr = "OFF";
-
   String timestamp = getTimestamp(rtc);
   Serial.println("Timestamp: " + timestamp);
 
@@ -68,44 +59,26 @@ void setup() {
   Serial.println("Battery Percentage: " + String(battery_info.percentage) +
                  "%");
 
-  int north49eReading = 10;
-  int south49eReading = 20;
-  int east49eReading = 30;
-  int west49eReading = 40;
+  String filename = getFilename(rtc);
+  Serial.println("Filename: " + filename);
 
-  int tach49eReading = 15;
+  Readings data;
+  data.dateTime = timestamp;
+  data.temperature = temperature;
+  data.humidity = humidity;
+  data.pressure = pressure;
+  data.windSpeed = -1.0;
+  data.windDirection = "NA";
+  data.batteryVoltage = battery_info.voltage;
+  data.batteryPercentage = battery_info.percentage;
 
-  WeatherData weather_data;
-  weather_data.temperature = temperature;
-  weather_data.humidity = humidity;
-  weather_data.pressure = pressure;
-  weather_data.windSpeed = tach49eReading;
-  weather_data.windDirection = "NORTH";
-  weather_data.uvIndexInt = uvIndexInt;
-  weather_data.uvIndexStr = uvIndexStr;
-  weather_data.dateTime = timestamp;
+  sdWriteReadings(data, filename);
 
-  sdWriteWeatherData(weather_data);
-
-  Diagnostics diagnostics;
-  diagnostics.dateTime = timestamp;
-  diagnostics.batteryVoltage = battery_info.voltage;
-  diagnostics.batteryPercentage = battery_info.percentage;
-  diagnostics.bme280Address = 118;
-  diagnostics.ds3231Address = 104;
-  diagnostics.uvSensorReading = 0;
-  diagnostics.north49eReading = 1.2;
-  diagnostics.south49eReading = 1.3;
-  diagnostics.east49eReading = 1.4;
-  diagnostics.west49eReading = 1.5;
-  diagnostics.tach49eReading = 1.6;
-
-  sdWriteDiagnostics(diagnostics);
-
-  Serial.println("Going to sleep now");
+  // Go to sleep for 5mins
+  Serial.println("Going to sleep now.");
   Serial.flush();
   delay(1000);
-  esp32DeepSleep(60);
+  esp32DeepSleep(300);
 }
 
 // Empty due to deep sleep

@@ -25,3 +25,13 @@ String getTimestamp(RTC_DS3231 &rtc) {
 
   return String(dateTime);
 }
+
+// Returns daily filename
+String getFilename(RTC_DS3231 &rtc) {
+  // Format: DD-MM-YYYY.csv
+  DateTime now = rtc.now();
+  char dateTime[25];
+  sprintf(dateTime, "%02d-%02d-%04d.csv", now.day(), now.month(), now.year());
+
+  return String(dateTime);
+}

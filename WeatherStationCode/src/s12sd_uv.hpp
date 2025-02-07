@@ -8,4 +8,5 @@ int getUVIndexValue(int uv_pin);
 // Gets the UV index (LOW-EXTREME) based on the sensor value.
 String getUVIndex(int uv_index_value);
 
+float uv_sensor_testing(int uv_pin);
 #endif

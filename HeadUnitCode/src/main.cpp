@@ -17,6 +17,7 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 RTC_DS3231 rtc;
 
 LatestReadings latest_readings;
+TimeDifference timeDifference;
 
 void setup() {
   Serial.begin(115200);
@@ -27,53 +28,49 @@ void setup() {
   setupDS3231(rtc);
 
   sdReadSetup();
-  sdReadGetLastLine();
+
+  // Get todays filename
+  String filename = getFilename(rtc);
+
+  sdReadGetLastLine(filename);
   sdReadGetLatestReadings(latest_readings);
 
-  Serial.println("Setup complete.");
+  // Serial.println("Setup complete.");
   // Serial.println("Temperature: " + String(latest_readings.temperature));
   // Serial.println("Humidity: " + String(latest_readings.humidity));
   // Serial.println("Pressure: " + String(latest_readings.pressure));
-  // Serial.println("UV Index: " + String(latest_readings.uvIndex));
-  // Serial.println("UV Index Str: " + latest_readings.uvIndexStr);
   // Serial.println("Wind Speed: " + String(latest_readings.windSpeed));
   // Serial.println("Wind Direction: " + latest_readings.windDirection);
   // Serial.println("Battery Percentage: " +
   //                String(latest_readings.batteryPercentage));
   // Serial.println("Day Date: " + latest_readings.dayDate);
   // Serial.println("Time: " + latest_readings.time);
+
+  // Serial.println("Time Difference: " + String(timeDifference.hours) +
+  //                " hours " + String(timeDifference.minutes) + " minutes " +
+  //                String(timeDifference.seconds) + " seconds");
+
+  ssd1306DisplayClear(display);
 }
 
 void loop() {
-  // Display live time and latest weather data for 5 seconds
-  ssd1306DisplayClear(display);
+  String dayDate = getDayDate(rtc);
+  String time = getTime(rtc);
 
-  for (int i = 0; i < 10; i++) {
-    // ssd1306DisplayClear(display);
-    String dayDate = getDayDate(rtc);
-    String time = getTime(rtc);
-
-    // Refreshes the time section of the display only (ie line 2)
-    int x, y;
-    for (y = 7; y <= 14; y++) {
-      for (x = 0; x < 127; x++) {
-        display.drawPixel(x, y, BLACK);
-      }
+  // Refreshes the time section of the display only (ie line 2)
+  int x, y;
+  for (y = 7; y <= 14; y++) {
+    for (x = 0; x < 127; x++) {
+      display.drawPixel(x, y, BLACK);
     }
-
-    ssd1306DisplayLiveTime(display, dayDate, time);
-    ssd1306DisplayWeatherData(
-        display, latest_readings.temperature, latest_readings.humidity,
-        latest_readings.pressure, latest_readings.uvIndex,
-        latest_readings.uvIndexStr, latest_readings.windSpeed,
-        latest_readings.windDirection);
-    delay(1000);
   }
-
-  // Display diagnostic information for 3 seconds and then reset
-  ssd1306DisplayDiagnostic(display, latest_readings.batteryPercentage,
-                           latest_readings.dayDate, latest_readings.time);
-  delay(3000);
+  ssd1306DisplayLiveTime(display, dayDate, time);
+  timeDifference =
+      getTimeDifference(rtc, latest_readings.time, latest_readings.dayDate);
+  ssd1306DisplayReadings(
+      display, latest_readings.temperature, latest_readings.humidity,
+      latest_readings.pressure, latest_readings.windSpeed,
+      latest_readings.windDirection, latest_readings.batteryPercentage,
+      timeDifference.hours, timeDifference.minutes, timeDifference.seconds);
+  delay(1000);
 }
-
-// Saturday 01/02/2025 - 13:04:19,26.90,49.20,1015.14,0,OFF,15.00,NORTH

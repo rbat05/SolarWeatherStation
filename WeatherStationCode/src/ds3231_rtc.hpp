@@ -7,4 +7,5 @@
 
 void setupRTC(RTC_DS3231 &rtc);
 String getTimestamp(RTC_DS3231 &rtc);
+String getFilename(RTC_DS3231 &rtc);
 #endif

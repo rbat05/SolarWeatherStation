@@ -1,12 +1,13 @@
 #include "sd_read.hpp"
 
-String LAST_LINE_WEATHER_DATA;
-String LAST_LINE_DIAGNOSTICS;
+// String LAST_LINE_READINGS;
+// String LAST_LINE_DIAGNOSTICS;
+String LAST_LINE_READINGS;
 
 void sdReadSetup() {
   // SD Card
   Serial.print("Initializing SD card...");
-
+  // DO NOT CHANGE 15->8, BREAKS FOR NO REASON
   if (!SD.begin(15)) {
     Serial.println("Initialization failed!");
     return;
@@ -16,112 +17,73 @@ void sdReadSetup() {
 
 // No other way to do this, library does not support reverse reading nor seek
 // functions
-void sdReadGetLastLine() {
+void sdReadGetLastLine(String filename) {
   File myFile;
-  myFile = SD.open("weather_data.csv", FILE_READ);
+  myFile = SD.open(filename, FILE_READ);
   if (myFile) {
-    Serial.println("weather_data.csv last line: ");
+    Serial.println(filename + " last line: ");
 
     // read from the file until there's nothing else in it:
-    LAST_LINE_WEATHER_DATA = "";
+    LAST_LINE_READINGS = "";
     while (myFile.available()) {
       String currentLine = myFile.readStringUntil('\n');
       if (currentLine.length() > 0) {
-        LAST_LINE_WEATHER_DATA = currentLine;
+        LAST_LINE_READINGS = currentLine;
       }
     }
     myFile.close();
 
     // Print the last line of the file
-    Serial.print("Found last line in weather_data.csv: ");
-    Serial.println(LAST_LINE_WEATHER_DATA);
+    Serial.print("Found last line in " + filename + ": ");
+    Serial.println(LAST_LINE_READINGS);
   } else {
     // if the file didn't open, print an error:
-    Serial.println("weather_data.csv failed to open.");
-  }
-
-  myFile = SD.open("diagnostics.csv", FILE_READ);
-  if (myFile) {
-    Serial.println("diagnostics.csv last line: ");
-
-    // read from the file until there's nothing else in it:
-    LAST_LINE_DIAGNOSTICS = "";
-    while (myFile.available()) {
-      String currentLine = myFile.readStringUntil('\n');
-      if (currentLine.length() > 0) {
-        LAST_LINE_DIAGNOSTICS = currentLine;
-      }
-    }
-    myFile.close();
-
-    // Print the last line of the file
-    Serial.print("Found last line in diagnostics.csv: ");
-    Serial.println(LAST_LINE_DIAGNOSTICS);
-  } else {
-    // if the file didn't open, print an error:
-    Serial.println("diagnostics.csv failed to open.");
+    Serial.println(filename + " failed to open.");
   }
 }
 
 LatestReadings sdReadGetLatestReadings(LatestReadings &latest_readings) {
   // Weather Data
-  latest_readings.dayDate = LAST_LINE_WEATHER_DATA.substring(
-      0, LAST_LINE_WEATHER_DATA.indexOf('-') - 1);
-  latest_readings.time =
-      LAST_LINE_WEATHER_DATA.substring(LAST_LINE_WEATHER_DATA.indexOf('-') + 2,
-                                       LAST_LINE_WEATHER_DATA.indexOf(','));
+  latest_readings.dayDate =
+      LAST_LINE_READINGS.substring(0, LAST_LINE_READINGS.indexOf('-') - 1);
+  latest_readings.time = LAST_LINE_READINGS.substring(
+      LAST_LINE_READINGS.indexOf('-') + 2, LAST_LINE_READINGS.indexOf(','));
 
-  LAST_LINE_WEATHER_DATA =
-      LAST_LINE_WEATHER_DATA.substring(LAST_LINE_WEATHER_DATA.indexOf(',') + 1);
+  LAST_LINE_READINGS =
+      LAST_LINE_READINGS.substring(LAST_LINE_READINGS.indexOf(',') + 1);
 
   latest_readings.temperature =
-      LAST_LINE_WEATHER_DATA.substring(0, LAST_LINE_WEATHER_DATA.indexOf(','))
+      LAST_LINE_READINGS.substring(0, LAST_LINE_READINGS.indexOf(','))
           .toFloat();
-  LAST_LINE_WEATHER_DATA =
-      LAST_LINE_WEATHER_DATA.substring(LAST_LINE_WEATHER_DATA.indexOf(',') + 1);
+  LAST_LINE_READINGS =
+      LAST_LINE_READINGS.substring(LAST_LINE_READINGS.indexOf(',') + 1);
 
   latest_readings.humidity =
-      LAST_LINE_WEATHER_DATA.substring(0, LAST_LINE_WEATHER_DATA.indexOf(','))
+      LAST_LINE_READINGS.substring(0, LAST_LINE_READINGS.indexOf(','))
           .toFloat();
-  LAST_LINE_WEATHER_DATA =
-      LAST_LINE_WEATHER_DATA.substring(LAST_LINE_WEATHER_DATA.indexOf(',') + 1);
+  LAST_LINE_READINGS =
+      LAST_LINE_READINGS.substring(LAST_LINE_READINGS.indexOf(',') + 1);
 
   latest_readings.pressure =
-      LAST_LINE_WEATHER_DATA.substring(0, LAST_LINE_WEATHER_DATA.indexOf(','))
+      LAST_LINE_READINGS.substring(0, LAST_LINE_READINGS.indexOf(','))
           .toFloat();
-  LAST_LINE_WEATHER_DATA =
-      LAST_LINE_WEATHER_DATA.substring(LAST_LINE_WEATHER_DATA.indexOf(',') + 1);
-
-  latest_readings.uvIndex =
-      LAST_LINE_WEATHER_DATA.substring(0, LAST_LINE_WEATHER_DATA.indexOf(','))
-          .toInt();
-  LAST_LINE_WEATHER_DATA =
-      LAST_LINE_WEATHER_DATA.substring(LAST_LINE_WEATHER_DATA.indexOf(',') + 1);
-
-  latest_readings.uvIndexStr =
-      LAST_LINE_WEATHER_DATA.substring(0, LAST_LINE_WEATHER_DATA.indexOf(','));
-  LAST_LINE_WEATHER_DATA =
-      LAST_LINE_WEATHER_DATA.substring(LAST_LINE_WEATHER_DATA.indexOf(',') + 1);
+  LAST_LINE_READINGS =
+      LAST_LINE_READINGS.substring(LAST_LINE_READINGS.indexOf(',') + 1);
 
   latest_readings.windSpeed =
-      LAST_LINE_WEATHER_DATA.substring(0, LAST_LINE_WEATHER_DATA.indexOf(','))
+      LAST_LINE_READINGS.substring(0, LAST_LINE_READINGS.indexOf(','))
           .toFloat();
-  LAST_LINE_WEATHER_DATA =
-      LAST_LINE_WEATHER_DATA.substring(LAST_LINE_WEATHER_DATA.indexOf(',') + 1);
+  LAST_LINE_READINGS =
+      LAST_LINE_READINGS.substring(LAST_LINE_READINGS.indexOf(',') + 1);
 
-  latest_readings.windDirection = LAST_LINE_WEATHER_DATA;
+  latest_readings.windDirection =
+      LAST_LINE_READINGS.substring(0, LAST_LINE_READINGS.indexOf(','));
+  LAST_LINE_READINGS =
+      LAST_LINE_READINGS.substring(LAST_LINE_READINGS.indexOf(',') + 1);
 
-  // Diagnostics
-  // Skip the first two values
-  LAST_LINE_DIAGNOSTICS =
-      LAST_LINE_DIAGNOSTICS.substring(LAST_LINE_DIAGNOSTICS.indexOf(',') + 1);
-  LAST_LINE_DIAGNOSTICS =
-      LAST_LINE_DIAGNOSTICS.substring(LAST_LINE_DIAGNOSTICS.indexOf(',') + 1);
-
-  // Extract the battery percentage value
-  latest_readings.batteryPercentage =
-      LAST_LINE_DIAGNOSTICS.substring(0, LAST_LINE_DIAGNOSTICS.indexOf(','))
-          .toFloat();
+  LAST_LINE_READINGS =
+      LAST_LINE_READINGS.substring(LAST_LINE_READINGS.indexOf(',') + 1);
+  latest_readings.batteryPercentage = LAST_LINE_READINGS.toFloat();
 
   return latest_readings;
 }
