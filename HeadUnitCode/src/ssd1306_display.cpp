@@ -70,16 +70,16 @@ void ssd1306DisplayReadings(Adafruit_SSD1306 &display, float latest_temperature,
   display.println("%");
 
   display.setCursor(0, 56);
+  display.display();
 
   // Only display most significant time difference
   if (hours > 0) {
     display.print(hours);
-    display.print("h ago...");
+    display.println("h ago...");
   } else if (minutes > 0) {
     display.print(minutes);
-    display.print("m ago...");
-  } else {
-    display.print(seconds);
+    display.println("m ago...");
+  } else if (seconds > 0) {
     display.println("Just Now...");
   }
 

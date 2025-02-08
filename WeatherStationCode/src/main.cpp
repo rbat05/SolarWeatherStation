@@ -37,7 +37,7 @@ void setup() {
   bme280Setup(bme280);
   setupRTC(rtc);
 
-  esp32ModemSleep();
+  // esp32ModemSleep();
   bme280ForcedMode();
   esp32ClockSpeedChange(80);
 
@@ -72,13 +72,14 @@ void setup() {
   data.batteryVoltage = battery_info.voltage;
   data.batteryPercentage = battery_info.percentage;
 
-  sdWriteReadings(data, filename);
+  String formattedData = sdWriteReadings(data, filename);
 
   // Go to sleep for 5mins
   Serial.println("Going to sleep now.");
   Serial.flush();
+  sendData(formattedData);
   delay(1000);
-  esp32DeepSleep(300);
+  esp32DeepSleep(10);
 }
 
 // Empty due to deep sleep

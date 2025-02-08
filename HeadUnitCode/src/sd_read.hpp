@@ -21,5 +21,6 @@ struct LatestReadings {
 void sdReadSetup();
 void sdReadGetLastLine(String filename);
 LatestReadings sdReadGetLatestReadings(LatestReadings &latest_readings);
+void sdWriteLatestReading(String filename, String data);
 
 #endif

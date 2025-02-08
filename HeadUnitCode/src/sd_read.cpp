@@ -42,6 +42,7 @@ void sdReadGetLastLine(String filename) {
   }
 }
 
+// gonna fucking kms why this shit so ugly
 LatestReadings sdReadGetLatestReadings(LatestReadings &latest_readings) {
   // Weather Data
   latest_readings.dayDate =
@@ -88,4 +89,24 @@ LatestReadings sdReadGetLatestReadings(LatestReadings &latest_readings) {
   return latest_readings;
 }
 
-// gonna fucking kms why this shit so ugly
+void sdWriteLatestReading(String filename, String data) {
+  File myFile;
+  myFile = SD.open(filename, FILE_WRITE);
+  // If file is empty, write the header which is
+  // DATE/TIME, TEMPERATURE, HUMIDITY, PRESSURE, WIND SPEED, WIND DIRECTION,
+  // BATTERY VOLTAGE, BATTERY PERCENTAGE
+  if (myFile) {
+    if (myFile.size() == 0) {
+      Serial.println("Writing header to " + filename + ":");
+      myFile.println(
+          "DATE/TIME, TEMPERATURE, HUMIDITY, PRESSURE, WIND SPEED, "
+          "WIND DIRECTION, BATTERY VOLTAGE, BATTERY PERCENTAGE");
+    }
+    Serial.println("Writing following data to " + filename + ":");
+    Serial.println(data);
+    myFile.println(data);
+    myFile.close();
+  } else {
+    Serial.println("Error writing to " + filename + ", file failed to open.");
+  }
+}

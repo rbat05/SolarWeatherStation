@@ -16,6 +16,6 @@ struct Readings {
 };
 
 bool sdGetInfo();
-void sdWriteReadings(Readings data, String filename);
+String sdWriteReadings(Readings data, String filename);
 
 #endif

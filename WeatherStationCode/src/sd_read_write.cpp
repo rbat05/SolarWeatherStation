@@ -128,7 +128,7 @@ bool sdGetInfo() {
 //   }
 // }
 
-void sdWriteReadings(Readings data, String filename) {
+String sdWriteReadings(Readings data, String filename) {
   // Check if the SD card is available
   // then, print out sd card info to serial
   // then, open/create the file with todays date
@@ -164,12 +164,15 @@ void sdWriteReadings(Readings data, String filename) {
       Serial.println("Writing following data to " + filename + ":");
       Serial.println(formattedData);
       myFile.println(formattedData);
+      return formattedData;
       myFile.close();
     } else {
       Serial.println("Error writing to " + filename + ", file failed to open.");
+      return "Aaa 01/01/2020 - 00:00:00,0.00,0.00,0.00,-1.00,NA,0.00,0.00";
     }
 
   } else {
     Serial.println("Error writing to " + filename + ", card failed to mount.");
+    return "Aaa 01/01/2020 - 00:00:00,0.00,0.00,0.00,-1.00,NA,0.00,0.00";
   }
 }
