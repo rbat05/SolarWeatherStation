@@ -1,5 +1,5 @@
-#ifndef SD_READ_HPP
-#define SD_READ_HPP
+#ifndef SD_READ_WRITE_HPP
+#define SD_READ_WRITE_HPP
 
 #include <SD.h>
 #include <SPI.h>

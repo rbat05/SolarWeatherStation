@@ -61,10 +61,10 @@ void bme280SleepMode() {
   Wire.endTransmission();
 }
 
-// Changes the sensor mode to normal mode
+// Changes the sensor mode to forced mode
 void bme280ForcedMode() {
   Wire.beginTransmission(SENSOR_ADDR);
   Wire.write((uint8_t)0xF4);  // Selecting the control measurement register
-  Wire.write((uint8_t)0b00100101);  // Setting the sensor mode to normal mode
+  Wire.write((uint8_t)0b00100101);  // Setting the sensor mode to forced mode
   Wire.endTransmission();
 }

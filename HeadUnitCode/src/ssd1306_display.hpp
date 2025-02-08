@@ -7,12 +7,11 @@
 void ssd1306DisplaySetup(Adafruit_SSD1306 &display);
 void ssd1306DisplayClear(Adafruit_SSD1306 &display);
 void ssd1306DisplayLiveTime(Adafruit_SSD1306 &display, String dayDate,
-                            String time);
+                            String time, int hours, int minutes, int seconds);
 void ssd1306DisplayReadings(Adafruit_SSD1306 &display, float latest_temperature,
                             float latest_humidity, float latest_pressure,
                             float latest_wind_speed,
                             String latest_wind_direction,
-                            float latest_battery_percentage, int hours,
-                            int minutes, int seconds);
+                            float latest_battery_percentage);
 
 #endif

@@ -2,6 +2,7 @@
 
 char daysOfTheWeek[7][12] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
 
+// Setup the DS3231 RTC
 void setupDS3231(RTC_DS3231 &rtc) {
   if (!rtc.begin()) {
     Serial.println("Couldn't find RTC");
@@ -9,6 +10,7 @@ void setupDS3231(RTC_DS3231 &rtc) {
   }
 }
 
+// Returns the current day date
 String getDayDate(RTC_DS3231 &rtc) {
   DateTime now = rtc.now();
 
@@ -19,6 +21,7 @@ String getDayDate(RTC_DS3231 &rtc) {
   return String(dayDate);
 }
 
+// Returns the current time
 String getTime(RTC_DS3231 &rtc) {
   DateTime now = rtc.now();
 

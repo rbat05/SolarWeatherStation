@@ -1,6 +1,7 @@
 #include "ssd1306_display.hpp"
 #define SSD1306_I2C_ADDRESS 0x3C  // Default I2C address for the OLED display
 
+// Setup the SSD1306 display
 void ssd1306DisplaySetup(Adafruit_SSD1306 &display) {
   if (!display.begin(SSD1306_SWITCHCAPVCC,
                      SSD1306_I2C_ADDRESS)) {  // Address 0x3D for 128x64
@@ -9,6 +10,7 @@ void ssd1306DisplaySetup(Adafruit_SSD1306 &display) {
   }
 }
 
+// Clear the SSD1306 display
 void ssd1306DisplayClear(Adafruit_SSD1306 &display) {
   display.clearDisplay();
   display.setTextSize(1);
@@ -17,33 +19,47 @@ void ssd1306DisplayClear(Adafruit_SSD1306 &display) {
   display.display();
 }
 
+// Format
+// Line 1: Live Day Date
+// Line 2: Live Time
+// Line 8: Time difference between latest reading and current time
+// Display the live time and the time difference between now and the last
+// reading
 void ssd1306DisplayLiveTime(Adafruit_SSD1306 &display, String dayDate,
-                            String time) {
+                            String time, int hours, int minutes, int seconds) {
   display.setCursor(0, 0);
   display.println(dayDate);
 
   display.setCursor(0, 8);
   display.println(time);
 
+  // Only display most significant time difference
+  display.setCursor(0, 56);
+  if (hours > 0) {
+    display.print(hours);
+    display.println("h ago...");
+  } else if (minutes > 0) {
+    display.print(minutes);
+    display.println("m ago...");
+  } else if (seconds > 0) {
+    display.println("Just Now...");
+  }
+
   display.display();
 }
 
 // Format
-// Live Day Date
-// Live Time
-// Latest Temperature
-// Latest Humidity
-// Latest Pressure
-// Latest Wind Speed & Direction
-// Latest Battery Percentage
-// Time difference between latest reading and current time
-
+// Line 3: Latest Temperature
+// Line 4: Latest Humidity
+// Line 5: Latest Pressure
+// Line 6: Latest Wind Speed & Direction
+// Line 7: Latest Battery Percentage
+// Display the latest readings on the OLED display
 void ssd1306DisplayReadings(Adafruit_SSD1306 &display, float latest_temperature,
                             float latest_humidity, float latest_pressure,
                             float latest_wind_speed,
                             String latest_wind_direction,
-                            float latest_battery_percentage, int hours,
-                            int minutes, int seconds) {
+                            float latest_battery_percentage) {
   display.setCursor(0, 16);
   display.print("Temp(");
   display.print((char)247);
@@ -68,20 +84,6 @@ void ssd1306DisplayReadings(Adafruit_SSD1306 &display, float latest_temperature,
   display.print("Battery: ");
   display.print(latest_battery_percentage);
   display.println("%");
-
-  display.setCursor(0, 56);
-  display.display();
-
-  // Only display most significant time difference
-  if (hours > 0) {
-    display.print(hours);
-    display.println("h ago...");
-  } else if (minutes > 0) {
-    display.print(minutes);
-    display.println("m ago...");
-  } else if (seconds > 0) {
-    display.println("Just Now...");
-  }
 
   display.display();
 }

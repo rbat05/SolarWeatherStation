@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 
+// Returns battery voltage and percentage in a struct
 BatteryInfo getBatteryInfo(int battery_pin) {
   BatteryInfo result;
   float rollingTotal = 0.0;
@@ -21,6 +22,7 @@ BatteryInfo getBatteryInfo(int battery_pin) {
   return result;
 }
 
+// Turns off ESP32 BT and WiFi
 void esp32ModemSleep() {
   esp_wifi_stop();
   esp_bt_controller_disable();
@@ -28,19 +30,14 @@ void esp32ModemSleep() {
   WiFi.mode(WIFI_OFF);
 }
 
-void esp32ModemWake() {
-  esp_wifi_start();
-  esp_bt_controller_enable(ESP_BT_MODE_CLASSIC_BT);
-  btStart();
-}
-
+// Puts ESP32 into deep sleep for input seconds
 void esp32DeepSleep(int seconds) {
   esp_sleep_enable_timer_wakeup(seconds * 1000000);
   Serial.println("Entering deep sleep for " + String(seconds) + " seconds.");
   esp_deep_sleep_start();
 }
 
-// 80 is good enough for sensors
+// Changes ESP32 clock speed to input value, 80 is good enough for sensors
 void esp32ClockSpeedChange(int freq) {
   switch (freq) {
     case 240:
@@ -74,6 +71,7 @@ void esp32ClockSpeedChange(int freq) {
   }
 }
 
+// Scans I2C bus for devices 10 times
 void I2CScan() {
   Wire.begin();                    /*I2C Communication begins*/
   Serial.println("\nI2C Scanner"); /*print scanner on serial monitor*/
@@ -115,6 +113,7 @@ void I2CScan() {
   }
 }
 
+// Prints the wakeup reason
 void printWakeupReason() {
   esp_sleep_wakeup_cause_t wakeup_reason;
 
@@ -139,5 +138,15 @@ void printWakeupReason() {
     default:
       Serial.printf("Wakeup was not caused by deep sleep: %d\n", wakeup_reason);
       break;
+  }
+}
+
+// Blinks an LED for input delay and times, used for debugging
+void blinkLED(int pin, int delay_ms, int times) {
+  for (int i = 0; i < times; i++) {
+    digitalWrite(pin, HIGH);
+    delay(delay_ms);
+    digitalWrite(pin, LOW);
+    delay(delay_ms);
   }
 }

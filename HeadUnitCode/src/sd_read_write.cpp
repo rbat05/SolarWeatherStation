@@ -1,11 +1,9 @@
-#include "sd_read.hpp"
+#include "sd_read_write.hpp"
 
-// String LAST_LINE_READINGS;
-// String LAST_LINE_DIAGNOSTICS;
 String LAST_LINE_READINGS;
 
+// Setup SD card
 void sdReadSetup() {
-  // SD Card
   Serial.print("Initializing SD card...");
   // DO NOT CHANGE 15->8, BREAKS FOR NO REASON
   if (!SD.begin(15)) {
@@ -15,15 +13,15 @@ void sdReadSetup() {
   Serial.println("Initialization done. SD on pin 8.");
 }
 
-// No other way to do this, library does not support reverse reading nor seek
-// functions
+// Get last line of the file, max length of file is 289 lines (60s * 60m * 24h /
+// updated every 300s) + header
 void sdReadGetLastLine(String filename) {
   File myFile;
   myFile = SD.open(filename, FILE_READ);
   if (myFile) {
     Serial.println(filename + " last line: ");
 
-    // read from the file until there's nothing else in it:
+    // Read from the file until there's nothing else in it:
     LAST_LINE_READINGS = "";
     while (myFile.available()) {
       String currentLine = myFile.readStringUntil('\n');
@@ -42,9 +40,9 @@ void sdReadGetLastLine(String filename) {
   }
 }
 
-// gonna fucking kms why this shit so ugly
+// Extract the latest readings from the last line of the file into a struct
+// variables
 LatestReadings sdReadGetLatestReadings(LatestReadings &latest_readings) {
-  // Weather Data
   latest_readings.dayDate =
       LAST_LINE_READINGS.substring(0, LAST_LINE_READINGS.indexOf('-') - 1);
   latest_readings.time = LAST_LINE_READINGS.substring(
@@ -89,6 +87,7 @@ LatestReadings sdReadGetLatestReadings(LatestReadings &latest_readings) {
   return latest_readings;
 }
 
+// Write the latest readings to the file, recieves through ESPNOW
 void sdWriteLatestReading(String filename, String data) {
   File myFile;
   myFile = SD.open(filename, FILE_WRITE);

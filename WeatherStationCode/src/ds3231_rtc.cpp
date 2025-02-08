@@ -14,7 +14,7 @@ void setupRTC(RTC_DS3231 &rtc) {
   Serial.println("RTC is connected.");
 }
 
-// Prints the current date and time
+// Returns the current date and time
 String getTimestamp(RTC_DS3231 &rtc) {
   DateTime now = rtc.now();
 
