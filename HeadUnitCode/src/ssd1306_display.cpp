@@ -3,10 +3,9 @@
 
 // Setup the SSD1306 display
 void ssd1306DisplaySetup(Adafruit_SSD1306 &display) {
-  if (!display.begin(SSD1306_SWITCHCAPVCC,
-                     SSD1306_I2C_ADDRESS)) {  // Address 0x3D for 128x64
+  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
     Serial.println(F("SSD1306 allocation failed"));
-    for (;;);
+    for (;;);  // Don't proceed, loop forever
   }
 }
 
@@ -15,8 +14,10 @@ void ssd1306DisplayClear(Adafruit_SSD1306 &display) {
   display.clearDisplay();
   display.setTextSize(1);
   display.setTextColor(WHITE);
-
+  Serial.println("Display Cleared.");
+  delay(1000);
   display.display();
+  Serial.println("Display Clearer");
 }
 
 // Format

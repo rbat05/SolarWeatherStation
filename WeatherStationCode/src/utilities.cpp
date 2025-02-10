@@ -140,13 +140,3 @@ void printWakeupReason() {
       break;
   }
 }
-
-// Blinks an LED for input delay and times, used for debugging
-void blinkLED(int pin, int delay_ms, int times) {
-  for (int i = 0; i < times; i++) {
-    digitalWrite(pin, HIGH);
-    delay(delay_ms);
-    digitalWrite(pin, LOW);
-    delay(delay_ms);
-  }
-}

@@ -14,4 +14,7 @@ String getTime(RTC_DS3231 &rtc);
 String getFilename(RTC_DS3231 &rtc);
 TimeDifference getTimeDifference(RTC_DS3231 &rtc, String latest_reading_time,
                                  String latest_reading_day_date);
+
+// Returns dates x days before today
+String getDateRange(RTC_DS3231 &rtc, int days);
 #endif

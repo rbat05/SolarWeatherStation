@@ -1,9 +1,13 @@
 #include <Arduino.h>
+#include <Arduino_JSON.h>
 #include <ESP8266WiFi.h>
 #include <espnow.h>
 
 #include <iostream>
 
+#include "ESPAsyncTCP.h"
+#include "ESPAsyncWebServer.h"
+#include "config.hpp"
 #include "ds3231_live.hpp"
 #include "sd_read_write.hpp"
 #include "ssd1306_display.hpp"
@@ -28,24 +32,30 @@ TimeDifference timeDifference;
 // String to hold the latest reading update, recieved through ESPNOW
 String LATEST_READING_UPDATE;
 
+// AsyncWebServer on port 80
+AsyncWebServer server(80);
+
+volatile bool dataReceived = false;
+
 // Callback function that will be executed when data is received
 void onDataReceived(uint8_t *senderMac, uint8_t *incomingData, uint8_t len) {
   // Write the incoming data to the uint8_t array
   uint8_t recieved[len + 1];
+
   Serial.print("Received: ");
+
   for (int i = 0; i < len; i++) {
     Serial.print((char)incomingData[i]);
     recieved[i] = incomingData[i];
   }
 
-  Serial.println();
+  recieved[len] = '\0';
 
   // Convert the uint8_t array to a String
   String recievedString = String((char *)recieved);
   // Write the latest reading to the SD card
   sdWriteLatestReading(getFilename(rtc), recievedString);
-  // Clear the display
-  ssd1306DisplayClear(display);
+  dataReceived = true;
 }
 
 void setup() {
@@ -61,8 +71,19 @@ void setup() {
 
   // ESPNOW setup
   // Set device as a Wi-Fi Station
-  WiFi.mode(WIFI_STA);
-  WiFi.disconnect();
+  WiFi.mode(WIFI_AP_STA);
+  // WiFi.disconnect(); // ESPNOW OLD
+  WiFi.begin(ssid, password);
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(1000);
+    Serial.println("Setting as a Wi-Fi Station..");
+  }
+
+  Serial.print("Station IP Address: ");
+  Serial.println(WiFi.localIP());
+  Serial.print("Wi-Fi Channel: ");
+  Serial.println(WiFi.channel());
 
   // Print MAC address of the receiver
   Serial.print("Receiver MAC: ");
@@ -80,8 +101,24 @@ void setup() {
     return;
   }
 
+  // Serve the landing page
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(SDFS, "/index.html", "text/html");
+  });
+
+  server.serveStatic("/", SDFS, "/");
+
+  // Get todays filename
+  String filename = getFilename(rtc);
+
+  // Get the latest readings from the SD card, store into latest_readings struct
+  sdReadGetLastLine(filename);
+  sdReadGetLatestReadings(latest_readings);
+  sdUpdateWebpage(latest_readings, filename);
+  server.begin();
+
   // Register callback for receiving data
-  esp_now_set_self_role(ESP_NOW_ROLE_SLAVE);
+  esp_now_set_self_role(ESP_NOW_ROLE_SLAVE);  // ESPNOW OLD
   esp_now_register_recv_cb(onDataReceived);
 }
 
@@ -118,7 +155,13 @@ void loop() {
   // Get the latest readings from the SD card, store into latest_readings struct
   sdReadGetLastLine(filename);
   sdReadGetLatestReadings(latest_readings);
-
+  if (dataReceived == true) {
+    sdUpdateWebpage(latest_readings, filename);
+    display.clearDisplay();
+    dataReceived = false;
+    Serial.flush();
+    Serial.println("Data received set to false.");
+  }
   // Serial.println("Setup complete.");
   // Serial.println("Temperature: " + String(latest_readings.temperature));
   // Serial.println("Humidity: " + String(latest_readings.humidity));
@@ -138,4 +181,7 @@ void loop() {
       display, latest_readings.temperature, latest_readings.humidity,
       latest_readings.pressure, latest_readings.windSpeed,
       latest_readings.windDirection, latest_readings.batteryPercentage);
+
+  // Serial.print("Free heap memory: ");
+  // Serial.println(ESP.getFreeHeap());
 }

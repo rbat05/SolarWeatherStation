@@ -11,7 +11,9 @@
 #include "sd_write.hpp"
 #include "utilities.hpp"
 
-#define LED_BUILTIN 2
+// Add this line to include the ESP32-specific header
+#include "soc/rtc_cntl_reg.h"
+#include "soc/soc.h"
 
 // BME280 - Connected via I2C, G22 = SCL, G21 = SDA
 Adafruit_BME280 bme280;
@@ -34,6 +36,8 @@ const int PIN_49E_WEST = 32;
 const int PIN_49E_TACH = 33;
 
 void setup() {
+  // Disable brownout detector, thug it out lil bro
+  WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
   Serial.begin(115200);
   printWakeupReason();
 
@@ -54,24 +58,20 @@ void setup() {
   // BME280 into sleep mode after readings taken
   bme280SleepMode();
 
-  // Serial.print("Temperature: " + String(temperature) + "°C ");
-  // Serial.print("Humidity: " + String(humidity) + "% ");
-  // Serial.println("Pressure: " + String(pressure) + "hPa");
-
-  blinkLED(LED_BUILTIN, 50, 3);
+  Serial.print("Temperature: " + String(temperature) + "°C ");
+  Serial.print("Humidity: " + String(humidity) + "% ");
+  Serial.println("Pressure: " + String(pressure) + "hPa");
 
   String timestamp = getTimestamp(rtc);
-  // Serial.println("Timestamp: " + timestamp);
+  Serial.println("Timestamp: " + timestamp);
 
   BatteryInfo battery_info = getBatteryInfo(BATTERY_PIN);
-  // Serial.print("Battery Voltage: " + String(battery_info.voltage) + "V ");
-  // Serial.println("Battery Percentage: " + String(battery_info.percentage) +
-  //                "%");
-
-  blinkLED(LED_BUILTIN, 50, 2);
+  Serial.print("Battery Voltage: " + String(battery_info.voltage) + "V ");
+  Serial.println("Battery Percentage: " + String(battery_info.percentage) +
+                 "%");
 
   String filename = getFilename(rtc);
-  // Serial.println("Filename: " + filename);
+  Serial.println("Filename: " + filename);
 
   // Create a data struct to hold all the readings
   Readings data;
@@ -84,17 +84,20 @@ void setup() {
   data.batteryVoltage = battery_info.voltage;
   data.batteryPercentage = battery_info.percentage;
 
+  if (!SD.begin(5)) {
+    Serial.println("Card Mount Failed");
+    return;
+  }
+
   // Get string representation of the data, and write data to SD
   String formattedData = sdWriteReadings(data, filename);
 
   // Send data via ESP-NOW
   sendData(formattedData);
-  blinkLED(LED_BUILTIN, 250, 4);
 
   // Clear the serial buffer, turn off modems
   Serial.flush();
   esp32ModemSleep();
-
   // Go to sleep for 5mins
   Serial.println("Going to sleep now.");
   esp32DeepSleep(300);

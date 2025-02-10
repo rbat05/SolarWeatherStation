@@ -65,3 +65,6 @@ TimeDifference getTimeDifference(RTC_DS3231 &rtc, String latest_reading_time,
 
   return timeDifference;
 }
+
+// Returns dates x days before today
+String getDateRange(RTC_DS3231 &rtc, int days) { return "Not implemented"; }

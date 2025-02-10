@@ -17,6 +17,5 @@ void esp32DeepSleep(int seconds);
 void esp32ClockSpeedChange(int freq);
 void I2CScan();
 void printWakeupReason();
-void blinkLED(int pin, int delay_ms, int times);
 
 #endif
