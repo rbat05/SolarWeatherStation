@@ -1,9 +1,42 @@
 # SolarWeatherStation
 A **solar-powered weather station** with an indoor head unit and a web server for displaying real-time weather data. Built using **ESP32** and **ESP8266** platforms with off-the-shelf components, featuring custom power management for self-sufficient operation.
 
-Images here:
-<!-- Optional: Hero image or animation -->
-<!-- ![Project Showcase](path/to/hero.gif) -->
+> **Note**: This project is a work in progress. The code and documentation are being updated regularly. Below are the images of the current state of the project.
+
+<p align="center">
+  <img src="images/FullSystem.jpg" alt="Solar Weather Electronics Station Setup"/><br>
+  <sub>Solar Weather Electronics Station Setup</sub>
+  <br><br>
+  <img src="images/ExternalNodeUnpowered.jpg" alt="External Node (Weather Station, Unpowered) -  Hardware Overview" width="600"/><br>
+  <sub>External Node (Weather Station, Unpowered) -  Hardware Overview</sub>
+  <br><br>
+  <img src="images/InternalNode.jpg" alt="Internal Node (Head Unit) - Hardware Overview" width="600"/><br>
+  <sub>Internal Node (Head Unit) - Hardware Overview</sub>
+  <br><br>
+  <img src="images/PowerSystem.jpg" alt="Solar and Battery Power Management System" width="600"/><br>
+  <sub>Solar and Battery Power Management System</sub>
+  <br><br>
+  <img src="images/ExternalNodePowered.jpg" alt="External Node in Operation (Powered Up)" width="600"/><br>
+  <sub>External Node in Operation (Powered Up)</sub>
+  <br><br>
+  <img src="images/DisplayCloseup.jpg" alt="Live Weather Data on OLED Display (Internal Node) - Metric Breakdown" width="600"/><br>
+  <sub>Live Weather Data on OLED Display (Internal Node) - Metric Breakdown</sub>
+  <br><br>
+  <img src="images/Webserver.png" alt="Current Webserver Implementation" width="600"/><br>
+  <sub>Current Webserver Implementation</sub>
+  <br><br>
+  <img src="images/InternalUnitEnclosure.jpg" alt="Internal Node Enclosure (Head Unit)" width="600"/><br>
+  <sub>Internal Node Enclosure (Head Unit)</sub>
+  <br><br>
+</p>
+
+### Currently In Progress
+
+- Full daily data synchronization between weather station and head unit
+- Enhanced web server: metrics and statistics
+- Improved web-based data visualization
+- 3D-printed enclosures for both external and internal nodes
+- Weatherproofing for the external node electronics
 
 # Table of Contents
 
@@ -149,7 +182,7 @@ Notes:
 
 # System Architecture
 <p align="center">
-  <img src="images/System_Architecture.pn" alt="System Architecture Diagram" width="500" />
+  <img src="images/System_Architecture.png" alt="System Architecture Diagram" width="500" />
 </p>
 
 1. Weather station reads data → timestamps using **RTC** → stores locally.
@@ -484,5 +517,5 @@ The project is functional for now, but there are several improvements and featur
 
 # License
 
-This project is licensed under the **MIT License**. 
+This project is licensed under the **GPL-3.0 license**. 
 You are free to use, modify, and distribute this project as long as you adhere to the license terms.
