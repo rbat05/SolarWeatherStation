@@ -35,6 +35,11 @@ const int PIN_49E_WEST = 32;
 // WIND SPEED
 const int PIN_49E_TACH = 33;
 
+// Program parameters
+const int SLEEP_SECONDS = 300;   // Sleep for 5 minutes
+const int ESP_CLOCK_SPEED = 80;  // Set clock speed to 80MHz
+const int SD_CS_PIN = 5;         // Chip select pin for SD card
+
 void setup() {
   // Disable brownout detector, thug it out lil bro
   WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
@@ -46,7 +51,7 @@ void setup() {
 
   // ESP BT and Wifi off, clock speed 240MHz->80MHz
   esp32ModemSleep();
-  esp32ClockSpeedChange(80);
+  esp32ClockSpeedChange(ESP_CLOCK_SPEED);
 
   // BME280 into forced mode to take readings
   bme280ForcedMode();
@@ -84,7 +89,7 @@ void setup() {
   data.batteryVoltage = battery_info.voltage;
   data.batteryPercentage = battery_info.percentage;
 
-  if (!SD.begin(5)) {
+  if (!SD.begin(SD_CS_PIN)) {
     Serial.println("Card Mount Failed");
     return;
   }
@@ -98,9 +103,10 @@ void setup() {
   // Clear the serial buffer, turn off modems
   Serial.flush();
   esp32ModemSleep();
+
   // Go to sleep for 5mins
   Serial.println("Going to sleep now.");
-  esp32DeepSleep(300);
+  esp32DeepSleep(SLEEP_SECONDS);
 }
 
 // Empty due to deep sleep

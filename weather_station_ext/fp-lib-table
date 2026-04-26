@@ -1,0 +1,6 @@
+(fp_lib_table
+	(version 7)
+	(lib (name "wemoss2") (type "KiCad") (uri "/home/rbat/Documents/wemoss2/wemoss2/wemoss2.pretty") (options "") (descr ""))
+	(lib (name "weather_station") (type "KiCad") (uri "${KIPRJMOD}/weather_station.pretty") (options "") (descr ""))
+	(lib (name "bme280_breakout") (type "KiCad") (uri "${KIPRJMOD}/bme280_breakout.pretty") (options "") (descr ""))
+)
