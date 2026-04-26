@@ -1,6 +1,13 @@
 # SolarWeatherStation
 A **solar-powered weather station** with an indoor head unit and a web server for displaying real-time weather data. Built using **ESP32** and **ESP8266** platforms with off-the-shelf components, featuring custom power management for self-sufficient operation.
 
+![Project Status](https://img.shields.io/badge/status-in--progress-yellow)
+![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)
+![Platform: ESP32](https://img.shields.io/badge/platform-ESP32-blue)
+![Platform: ESP8266](https://img.shields.io/badge/platform-ESP8266-blue)
+![Framework: Arduino](https://img.shields.io/badge/framework-Arduino-green)
+![PlatformIO](https://img.shields.io/badge/built%20with-PlatformIO-orange)
+![Last Commit](https://img.shields.io/github/last-commit/rbat05/SolarWeatherStation)
 > **Note**: This project is a work in progress. The code and documentation are being updated regularly. Below are the images of the current state of the project.
 
 <p align="center">
@@ -108,16 +115,16 @@ Data is stored efficiently in daily CSV files, allowing for easy historical trac
 # Performance
 
 - External node lasts for **1 week** on battery power alone, allowing for continuous operation even in bad weather.
-  - Average power consumptionis around **TBC** during deep sleep, with spikes during data collection and transmission.
+  - Average system power consumption is around **150µA** during deep sleep, with spikes during data collection and transmission upto a maximum of **240mA**.
 
 
 
-# Design Showcase
+# Design Showcase (TBD)
 
 <!-- Optional: Animated GIF or main render -->
 <!-- ![Showcase Animation](path/to/animation.gif) -->
 
-<p align="center">
+<!-- <p align="center">
   <img src="path/to/image1.png" alt="Description 1" width="350"/><br>
   <sub>Description 1</sub>
   <br><br>
@@ -132,7 +139,7 @@ Data is stored efficiently in daily CSV files, allowing for easy historical trac
   <sub>Description 4</sub>
 </p>
 
-[Design files](path/to/design_files.pdf) available as PDFs in `/cad` folder.
+[Design files](path/to/design_files.pdf) available as PDFs in `/cad` folder. -->
 
 # Bill of Materials
 
