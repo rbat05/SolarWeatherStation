@@ -6,7 +6,7 @@
 
 #include "49e_wind_speed_dir.hpp"
 #include "bme280_temp_humi_pres.hpp"
-#include "ds3231_rtc.hpp"
+#include "ds1307_rtc.hpp"
 #include "espNOW_send.hpp"
 #include "sd_write.hpp"
 #include "utilities.hpp"
@@ -22,8 +22,8 @@ const int I2C_SCL = 35;
 // BME280 - Connected via I2C
 Adafruit_BME280 bme280;
 
-// DS3231 - Connected via I2C
-RTC_DS3231 rtc;
+// Tiny RTC (DS1307) - Connected via I2C
+RTC_DS1307 rtc;
 
 // Battery Pin - Connected via Analog, G1 = Battery
 const int BATTERY_PIN = 1;
@@ -142,7 +142,7 @@ void setup() {
   digitalWrite(LED, LOW);
   delay(500);
 
-  // Go to sleep for 5mins
+  // Go to sleep for 30sec
   Serial.println("Going to sleep now.");
   esp32DeepSleep(SLEEP_SECONDS);
 }
