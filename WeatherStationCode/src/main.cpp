@@ -15,14 +15,18 @@
 #include "soc/rtc_cntl_reg.h"
 #include "soc/soc.h"
 
-// BME280 - Connected via I2C, G22 = SCL, G21 = SDA
+// Custom I2C Pins
+const int I2C_SDA = 33;
+const int I2C_SCL = 35;
+
+// BME280 - Connected via I2C
 Adafruit_BME280 bme280;
 
-// DS3231 - Connected via I2C, G22 = SCL, G21 = SDA
+// DS3231 - Connected via I2C
 RTC_DS3231 rtc;
 
-// Battery Pin - Connected via Analog, G25 = Battery
-const int BATTERY_PIN = 25;
+// Battery Pin - Connected via Analog, G1 = Battery
+const int BATTERY_PIN = 1;
 
 // 49E - Connected via Analog, G39 = North, G34 = South, G35 = East, G32 = West
 // WIND DIRECTION
@@ -36,14 +40,38 @@ const int PIN_49E_WEST = 32;
 const int PIN_49E_TACH = 33;
 
 // Program parameters
-const int SLEEP_SECONDS = 300;   // Sleep for 5 minutes
+const int SLEEP_SECONDS = 30;    // Sleep for 30 seconds
 const int ESP_CLOCK_SPEED = 80;  // Set clock speed to 80MHz
-const int SD_CS_PIN = 5;         // Chip select pin for SD card
+
+// Custom SPI Pins
+const int SPI_SCK = 7;
+const int SPI_MISO = 9;
+const int SPI_MOSI = 11;
+const int SD_CS_PIN = 12;  // Chip select pin for SD card
+
+// LED Pin
+const int LED = 15;
 
 void setup() {
   // Disable brownout detector, thug it out lil bro
   WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
   Serial.begin(115200);
+
+  // Blink LED twice - signify program start
+  pinMode(LED, OUTPUT);
+  digitalWrite(LED, HIGH);
+  delay(500);
+  digitalWrite(LED, LOW);
+  delay(500);
+  digitalWrite(LED, HIGH);
+  delay(500);
+  digitalWrite(LED, LOW);
+  delay(500);
+
+  // Explicitly start I2C and SPI using our defined pins
+  Wire.begin(I2C_SDA, I2C_SCL);
+  SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI, SD_CS_PIN);
+
   printWakeupReason();
 
   bme280Setup(bme280);
@@ -103,6 +131,16 @@ void setup() {
   // Clear the serial buffer, turn off modems
   Serial.flush();
   esp32ModemSleep();
+
+  // Blink LED twice - signify program end
+  digitalWrite(LED, HIGH);
+  delay(500);
+  digitalWrite(LED, LOW);
+  delay(500);
+  digitalWrite(LED, HIGH);
+  delay(500);
+  digitalWrite(LED, LOW);
+  delay(500);
 
   // Go to sleep for 5mins
   Serial.println("Going to sleep now.");

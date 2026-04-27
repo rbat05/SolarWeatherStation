@@ -3,7 +3,6 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <Wire.h>
-#include <esp_bt.h>
 #include <esp_wifi.h>
 
 struct BatteryInfo {

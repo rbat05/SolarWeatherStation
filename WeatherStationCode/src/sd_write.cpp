@@ -3,7 +3,7 @@
 bool sdGetInfo() {
   // Check if the SD card is available
   // then, print out sd card info to serial
-  int chipSelect = 5;
+  int chipSelect = 12;
   pinMode(chipSelect, OUTPUT);
 
   // Check if the card is available
@@ -49,7 +49,7 @@ String sdWriteReadings(Readings data, String filename) {
   // then, write the formatted string to the file on new line
   // then, close the file
   File myFile;
-  int chipSelect = 5;
+  int chipSelect = 12;
   pinMode(chipSelect, OUTPUT);
 
   bool cardMounted = sdGetInfo();

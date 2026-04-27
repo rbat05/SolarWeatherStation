@@ -5,13 +5,24 @@
 // Returns battery voltage and percentage in a struct
 BatteryInfo getBatteryInfo(int battery_pin) {
   BatteryInfo result;
+
+  // Set ADC configuration for ESP32-S2
+  analogReadResolution(12);        // 0-4095 range for ESP32-S2
+  analogSetAttenuation(ADC_11db);  // Sets max voltage to ~2.5V
+
   float rollingTotal = 0.0;
   for (int i = 0; i < 100; i++) {
-    rollingTotal += analogReadMilliVolts(25);
+    rollingTotal += analogRead(battery_pin);
   }
 
-  float batLiPo = rollingTotal / 100;
-  float batVoltage = (batLiPo / 0.652) / 1000;
+  float averageRaw = rollingTotal / 100.0;
+
+  // Step 1: Convert raw value to Voltage at the ADC Pin (0.0 - 2.5V)
+  float v_adc = (averageRaw / 4095.0) * 2.5;
+
+  // Step 2: Scale back up to Battery Voltage using divider ratio
+  // V_bat = V_adc * ((R1 + R2) / R2) with R1 = 68k, R2 = 100k
+  float batVoltage = v_adc * ((68000.0 + 100000.0) / 100000.0);
   float batPercentage = (batVoltage / 4.2) * 100;
 
   batPercentage = min(round(batPercentage), static_cast<float>(100.0));
@@ -22,11 +33,9 @@ BatteryInfo getBatteryInfo(int battery_pin) {
   return result;
 }
 
-// Turns off ESP32 BT and WiFi
+// Turns off ESP32 WiFi (S2 has no BT)
 void esp32ModemSleep() {
   esp_wifi_stop();
-  esp_bt_controller_disable();
-  btStop();
   WiFi.mode(WIFI_OFF);
 }
 
