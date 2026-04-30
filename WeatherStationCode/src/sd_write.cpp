@@ -1,5 +1,9 @@
 #include "sd_write.hpp"
 
+// Store up to 10 readings of max 128 characters each in deep sleep memory
+RTC_DATA_ATTR char savedReadings[10][128];
+RTC_DATA_ATTR int savedReadingsCount = 0;
+
 bool sdGetInfo() {
   // Check if the SD card is available
   // then, print out sd card info to serial
@@ -52,6 +56,14 @@ String sdWriteReadings(Readings data, String filename) {
   int chipSelect = 12;
   pinMode(chipSelect, OUTPUT);
 
+  // Always format the data so we can at least send it via ESP-NOW if the SD
+  // fails
+  String formattedData =
+      data.dateTime + "," + String(data.temperature) + "," +
+      String(data.humidity) + "," + String(data.pressure) + "," +
+      String(data.windSpeed) + "," + data.windDirection + "," +
+      String(data.batteryVoltage) + "," + String(data.batteryPercentage);
+
   bool cardMounted = sdGetInfo();
   if (cardMounted) {
     Serial.println("Attempting to write to " + filename + ", card mounted.");
@@ -67,23 +79,44 @@ String sdWriteReadings(Readings data, String filename) {
             "DATE/TIME, TEMPERATURE, HUMIDITY, PRESSURE, WIND SPEED, "
             "WIND DIRECTION, BATTERY VOLTAGE, BATTERY PERCENTAGE");
       }
-      String formattedData =
-          data.dateTime + "," + String(data.temperature) + "," +
-          String(data.humidity) + "," + String(data.pressure) + "," +
-          String(data.windSpeed) + "," + data.windDirection + "," +
-          String(data.batteryVoltage) + "," + String(data.batteryPercentage);
+
+      // Write any backlogged readings stored in memory first
+      if (savedReadingsCount > 0) {
+        Serial.printf("Writing %d saved backlogged readings...\n",
+                      savedReadingsCount);
+        for (int i = 0; i < savedReadingsCount; i++) {
+          myFile.println(String(savedReadings[i]));
+        }
+        savedReadingsCount = 0;  // Reset counter
+      }
+
       Serial.println("Writing following data to " + filename + ":");
       Serial.println(formattedData);
       myFile.println(formattedData);
-      return formattedData;
       myFile.close();
+      return formattedData;
     } else {
       Serial.println("Error writing to " + filename + ", file failed to open.");
-      return "Aaa 01/01/2020 - 00:00:00,0.00,0.00,0.00,-1.00,NA,0.00,0.00";
     }
 
   } else {
     Serial.println("Error writing to " + filename + ", card failed to mount.");
-    return "Aaa 01/01/2020 - 00:00:00,0.00,0.00,0.00,-1.00,NA,0.00,0.00";
   }
+
+  // Fallback: If SD failed, store reading in RTC memory to survive Deep Sleep
+  Serial.println("Storing reading in RTC memory for next boot.");
+  if (savedReadingsCount < 10) {
+    strncpy(savedReadings[savedReadingsCount], formattedData.c_str(), 127);
+    savedReadings[savedReadingsCount][127] = '\0';  // Ensure null-termination
+    savedReadingsCount++;
+  } else {
+    // Buffer is full: shift old readings out to make room for newest one
+    for (int i = 1; i < 10; i++) {
+      strncpy(savedReadings[i - 1], savedReadings[i], 128);
+    }
+    strncpy(savedReadings[9], formattedData.c_str(), 127);
+    savedReadings[9][127] = '\0';
+  }
+
+  return formattedData;
 }

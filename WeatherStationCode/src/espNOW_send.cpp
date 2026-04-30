@@ -4,7 +4,7 @@
 uint8_t receiverAddress[] = {0x2c, 0x3a, 0xe8, 0x08, 0xdb, 0x6a};
 
 // Callback function when data is sent
-void onDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
+void onDataSent(const uint8_t* mac_addr, esp_now_send_status_t status) {
   Serial.print("Last Packet Send Status: ");
 
   // Check if the packet was sent
@@ -38,7 +38,7 @@ void sendData(String data) {
   esp_now_peer_info_t peerInfo;
   memset(&peerInfo, 0, sizeof(peerInfo));
   memcpy(peerInfo.peer_addr, receiverAddress, 6);
-  peerInfo.channel = 0;
+  peerInfo.channel = 1;  // Use a fixed channel (e.g., 1, 6, or 11)
   peerInfo.encrypt = false;
 
   // Try to add peer to ESP-NOW

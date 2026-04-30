@@ -60,13 +60,13 @@ void setup() {
   // Blink LED twice - signify program start
   pinMode(LED, OUTPUT);
   digitalWrite(LED, HIGH);
-  delay(500);
+  delay(50);
   digitalWrite(LED, LOW);
-  delay(500);
+  delay(50);
   digitalWrite(LED, HIGH);
-  delay(500);
+  delay(50);
   digitalWrite(LED, LOW);
-  delay(500);
+  delay(50);
 
   // Explicitly start I2C and SPI using our defined pins
   Wire.begin(I2C_SDA, I2C_SCL);
@@ -117,11 +117,6 @@ void setup() {
   data.batteryVoltage = battery_info.voltage;
   data.batteryPercentage = battery_info.percentage;
 
-  if (!SD.begin(SD_CS_PIN)) {
-    Serial.println("Card Mount Failed");
-    return;
-  }
-
   // Get string representation of the data, and write data to SD
   String formattedData = sdWriteReadings(data, filename);
 
@@ -134,18 +129,44 @@ void setup() {
 
   // Blink LED twice - signify program end
   digitalWrite(LED, HIGH);
-  delay(500);
+  delay(50);
   digitalWrite(LED, LOW);
-  delay(500);
+  delay(50);
   digitalWrite(LED, HIGH);
-  delay(500);
+  delay(50);
   digitalWrite(LED, LOW);
-  delay(500);
+  delay(50);
 
   // Go to sleep for 30sec
   Serial.println("Going to sleep now.");
   esp32DeepSleep(SLEEP_SECONDS);
 }
 
-// Empty due to deep sleep
-void loop() {}
+int loopCounter = 0;
+
+// Safety catch loop
+void loop() {
+  loopCounter++;
+  if (loopCounter >= 1000) {
+    Serial.println(
+        "Safety catch triggered: Trapped in loop, forcing deep sleep!");
+    esp32DeepSleep(SLEEP_SECONDS);
+  }
+  delay(10);  // Prevent watchdog timeout while looping
+}
+
+/*
+ * Power Consumption & Battery Life Estimate
+ * ---------------------------------------
+ * Based on a 5-minute (300s) deep sleep cycle and a 4000mAh LiPo battery.
+ *
+ * 1. Active Mode: ~8.0 seconds per cycle
+ *    - Average Active Current: ~60 mA (includes SD write and ESP-NOW WiFi
+ * spikes)
+ * 2. Deep Sleep Mode: ~292 seconds per cycle
+ *    - Average Sleep Current: ~0.5 mA (500 uA, largely from MicroSD module idle
+ * draw)
+ *
+ * Weighted Average Current: ~2.08 mA
+ * Estimated Runtime (without solar): ~76 Days
+ */

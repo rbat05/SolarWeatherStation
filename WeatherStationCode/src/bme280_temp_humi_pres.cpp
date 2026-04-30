@@ -5,7 +5,7 @@
 // If connected, the program will continue
 // If not, the program will be stuck in an infinite loop until the sensor is
 // connected or ESP is reset
-void bme280Setup(Adafruit_BME280 &bme280) {
+void bme280Setup(Adafruit_BME280& bme280) {
   bool status = bme280.begin(SENSOR_ADDR);
 
   if (status == true) {
@@ -13,12 +13,11 @@ void bme280Setup(Adafruit_BME280 &bme280) {
     return;
   } else {
     Serial.println("BME280 sensor is not connected, check wiring or reset.");
-    while (1);
   }
 }
 
 // Returns the temperature in Celsius after sampling 100 times
-float bme280GetTemperature(Adafruit_BME280 &bme280) {
+float bme280GetTemperature(Adafruit_BME280& bme280) {
   float rollingSum = 0.0;
   float average = 0.0;
   for (int i = 0; i < 100; i++) {
@@ -30,7 +29,7 @@ float bme280GetTemperature(Adafruit_BME280 &bme280) {
 }
 
 // Returns the humidity in Percentage after sampling 100 times
-float bme280GetHumidity(Adafruit_BME280 &bme280) {
+float bme280GetHumidity(Adafruit_BME280& bme280) {
   float rollingSum = 0.0;
   float average = 0.0;
   for (int i = 0; i < 100; i++) {
@@ -42,7 +41,7 @@ float bme280GetHumidity(Adafruit_BME280 &bme280) {
 }
 
 // Returns the pressure in hPa after sampling 100 times
-float bme280GetPressure(Adafruit_BME280 &bme280) {
+float bme280GetPressure(Adafruit_BME280& bme280) {
   float rollingSum = 0.0;
   float average = 0.0;
   for (int i = 0; i < 100; i++) {
