@@ -1,10 +1,10 @@
-#include "ds1307_rtc.hpp"
+#include "ds3231_rtc.hpp"
 #define SENSOR_ADDR 0x68
 
 char daysOfTheWeek[7][12] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
 
-// Checks if the Tiny RTC (DS1307) sensor is connected
-void setupRTC(RTC_DS1307& rtc) {
+// Checks if the DS3231 sensor is connected
+void setupRTC(RTC_DS3231& rtc) {
   if (!rtc.begin()) {
     Serial.println("Couldn't find RTC.");
     Serial.flush();
@@ -14,7 +14,7 @@ void setupRTC(RTC_DS1307& rtc) {
 }
 
 // Returns the current date and time
-String getTimestamp(RTC_DS1307& rtc) {
+String getTimestamp(RTC_DS3231& rtc) {
   DateTime now = rtc.now();
 
   char dateTime[33];
@@ -26,7 +26,7 @@ String getTimestamp(RTC_DS1307& rtc) {
 }
 
 // Returns daily filename
-String getFilename(RTC_DS1307& rtc) {
+String getFilename(RTC_DS3231& rtc) {
   // Format: YYYY-MM-DD.csv
   DateTime now = rtc.now();
   char dateTime[25];

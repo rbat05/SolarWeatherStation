@@ -6,7 +6,7 @@
 
 #include "49e_wind_speed_dir.hpp"
 #include "bme280_temp_humi_pres.hpp"
-#include "ds1307_rtc.hpp"
+#include "ds3231_rtc.hpp"
 #include "espNOW_send.hpp"
 #include "sd_write.hpp"
 #include "utilities.hpp"
@@ -22,8 +22,8 @@ const int I2C_SCL = 35;
 // BME280 - Connected via I2C
 Adafruit_BME280 bme280;
 
-// Tiny RTC (DS1307) - Connected via I2C
-RTC_DS1307 rtc;
+// DS3231 RTC - Connected via I2C
+RTC_DS3231 rtc;
 
 // Battery Pin - Connected via Analog, G1 = Battery
 const int BATTERY_PIN = 1;
@@ -160,13 +160,18 @@ void loop() {
  * ---------------------------------------
  * Based on a 5-minute (300s) deep sleep cycle and a 4000mAh LiPo battery.
  *
+ * WARNING: The DS3231 module's power-on LED is a major power drain!
+ *
  * 1. Active Mode: ~8.0 seconds per cycle
  *    - Average Active Current: ~60 mA (includes SD write and ESP-NOW WiFi
  * spikes)
  * 2. Deep Sleep Mode: ~292 seconds per cycle
- *    - Average Sleep Current: ~0.5 mA (500 uA, largely from MicroSD module idle
- * draw)
+ *    - Average Sleep Current: ~2.5 mA (0.5mA from SD module + 2.0mA from RTC
+ * LED)
  *
- * Weighted Average Current: ~2.08 mA
- * Estimated Runtime (without solar): ~76 Days
+ * Weighted Average Current: ~4.03 mA
+ * Estimated Runtime (without solar): ~41 Days
+ *
+ * To achieve >2 months of battery life, the power LED on the DS3231 module
+ * MUST be physically removed.
  */
