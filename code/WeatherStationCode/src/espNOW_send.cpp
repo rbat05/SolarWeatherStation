@@ -1,6 +1,6 @@
 #include "espNOW_send.hpp"
 
-// Head Unit ESP8266 permanent MAC address
+// Relay ESP8266 permanent MAC address
 uint8_t receiverAddress[] = {0x2c, 0x3a, 0xe8, 0x08, 0xdb, 0x6a};
 
 volatile bool espNowDeliverySuccess = false;

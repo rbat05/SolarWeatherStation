@@ -81,7 +81,7 @@ void onDataReceived(uint8_t* senderMac, uint8_t* incomingData, uint8_t len) {
 
 void setup() {
   Serial.begin(115200);
-  Serial.println("\nStarting Head Unit Relay...");
+  Serial.println("\nStarting Relay...");
 
   // Set device as a Wi-Fi Station
   WiFi.mode(WIFI_AP_STA);
@@ -108,7 +108,7 @@ void setup() {
   }
 
   // Setup OTA
-  ArduinoOTA.setHostname("HeadUnit-Relay");
+  ArduinoOTA.setHostname("Relay");
   ArduinoOTA.onStart([]() { Serial.println("\nStarting OTA update..."); });
   ArduinoOTA.onEnd([]() { Serial.println("\nOTA Update Complete!"); });
   ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
