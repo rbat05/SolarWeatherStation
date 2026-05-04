@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <ArduinoOTA.h>
 #include <ESP8266HTTPClient.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266WiFi.h>
@@ -106,8 +107,27 @@ void setup() {
     return;
   }
 
-  // Force receive channel to 1
-  wifi_set_channel(1);
+  // Setup OTA
+  ArduinoOTA.setHostname("HeadUnit-Relay");
+  ArduinoOTA.onStart([]() { Serial.println("\nStarting OTA update..."); });
+  ArduinoOTA.onEnd([]() { Serial.println("\nOTA Update Complete!"); });
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+  });
+  ArduinoOTA.onError([](ota_error_t error) {
+    Serial.printf("Error[%u]: ", error);
+    if (error == OTA_AUTH_ERROR)
+      Serial.println("Auth Failed");
+    else if (error == OTA_BEGIN_ERROR)
+      Serial.println("Begin Failed");
+    else if (error == OTA_CONNECT_ERROR)
+      Serial.println("Connect Failed");
+    else if (error == OTA_RECEIVE_ERROR)
+      Serial.println("Receive Failed");
+    else if (error == OTA_END_ERROR)
+      Serial.println("End Failed");
+  });
+  ArduinoOTA.begin();
 
   // Setup Health Web Server
   server.on("/", handleRoot);
@@ -121,6 +141,9 @@ void setup() {
 }
 
 void loop() {
+  // Handle OTA updates
+  ArduinoOTA.handle();
+
   // Listen for incoming HTTP requests to the health dashboard
   server.handleClient();
 

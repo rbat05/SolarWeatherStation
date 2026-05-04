@@ -44,7 +44,7 @@ bool sendData(String data) {
     esp_now_peer_info_t peerInfo;
     memset(&peerInfo, 0, sizeof(peerInfo));
     memcpy(peerInfo.peer_addr, receiverAddress, 6);
-    peerInfo.channel = 1;  // Use a fixed channel (e.g., 1, 6, or 11)
+    peerInfo.channel = 6;  // Use a fixed channel (e.g., 1, 6, or 11)
     peerInfo.encrypt = false;
 
     // Try to add peer to ESP-NOW
