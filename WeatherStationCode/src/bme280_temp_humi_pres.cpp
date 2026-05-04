@@ -9,10 +9,10 @@ void bme280Setup(Adafruit_BME280& bme280) {
   bool status = bme280.begin(SENSOR_ADDR);
 
   if (status == true) {
-    Serial.printf("BME280 sensor is connected @0x%X!\n", SENSOR_ADDR);
+    // Serial.printf("BME280 sensor is connected @0x%X!\n", SENSOR_ADDR);
     return;
   } else {
-    Serial.println("BME280 sensor is not connected, check wiring or reset.");
+    // Serial.println("BME280 sensor is not connected, check wiring or reset.");
   }
 }
 

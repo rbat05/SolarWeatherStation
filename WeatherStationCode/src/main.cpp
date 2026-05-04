@@ -4,7 +4,6 @@
 
 #include <iostream>  // Built-in library
 
-#include "49e_wind_speed_dir.hpp"
 #include "bme280_temp_humi_pres.hpp"
 #include "ds3231_rtc.hpp"
 #include "espNOW_send.hpp"
@@ -28,17 +27,6 @@ RTC_DS3231 rtc;
 // Battery Pin - Connected via Analog, G1 = Battery
 const int BATTERY_PIN = 1;
 
-// 49E - Connected via Analog, G39 = North, G34 = South, G35 = East, G32 = West
-// WIND DIRECTION
-const int PIN_49E_NORTH = 39;
-const int PIN_49E_SOUTH = 34;
-const int PIN_49E_EAST = 35;
-const int PIN_49E_WEST = 32;
-
-// 49E - Connected via Analog, G33 = Tachometer
-// WIND SPEED
-const int PIN_49E_TACH = 33;
-
 // Program parameters
 const int SLEEP_SECONDS = 30;    // Sleep for 30 seconds
 const int ESP_CLOCK_SPEED = 80;  // Set clock speed to 80MHz
@@ -51,6 +39,10 @@ const int SD_CS_PIN = 12;  // Chip select pin for SD card
 
 // LED Pin
 const int LED = 15;
+
+// Store up to 10 readings for ESP-NOW in RTC memory
+RTC_DATA_ATTR char espNowBuffer[10][128];
+RTC_DATA_ATTR int espNowBufferCount = 0;
 
 void setup() {
   // Disable brownout detector, thug it out lil bro
@@ -91,20 +83,20 @@ void setup() {
   // BME280 into sleep mode after readings taken
   bme280SleepMode();
 
-  Serial.print("Temperature: " + String(temperature) + "°C ");
-  Serial.print("Humidity: " + String(humidity) + "% ");
-  Serial.println("Pressure: " + String(pressure) + "hPa");
+  // Serial.print("Temperature: " + String(temperature) + "°C ");
+  // Serial.print("Humidity: " + String(humidity) + "% ");
+  // Serial.println("Pressure: " + String(pressure) + "hPa");
 
   String timestamp = getTimestamp(rtc);
-  Serial.println("Timestamp: " + timestamp);
+  // Serial.println("Timestamp: " + timestamp);
 
   BatteryInfo battery_info = getBatteryInfo(BATTERY_PIN);
-  Serial.print("Battery Voltage: " + String(battery_info.voltage) + "V ");
-  Serial.println("Battery Percentage: " + String(battery_info.percentage) +
-                 "%");
+  // Serial.print("Battery Voltage: " + String(battery_info.voltage) + "V ");
+  // Serial.println("Battery Percentage: " + String(battery_info.percentage) +
+  //                "%");
 
   String filename = getFilename(rtc);
-  Serial.println("Filename: " + filename);
+  // Serial.println("Filename: " + filename);
 
   // Create a data struct to hold all the readings
   Readings data;
@@ -112,16 +104,44 @@ void setup() {
   data.temperature = temperature;
   data.humidity = humidity;
   data.pressure = pressure;
-  data.windSpeed = -1.0;
-  data.windDirection = "NA";
   data.batteryVoltage = battery_info.voltage;
   data.batteryPercentage = battery_info.percentage;
 
   // Get string representation of the data, and write data to SD
   String formattedData = sdWriteReadings(data, filename);
 
-  // Send data via ESP-NOW
-  sendData(formattedData);
+  // 1. Add current reading to ESP-NOW buffer
+  if (espNowBufferCount < 10) {
+    strncpy(espNowBuffer[espNowBufferCount], formattedData.c_str(), 127);
+    espNowBuffer[espNowBufferCount][127] = '\0';
+    espNowBufferCount++;
+  } else {
+    // Buffer is full: shift old readings out to make room for newest one
+    for (int i = 1; i < 10; i++) {
+      strncpy(espNowBuffer[i - 1], espNowBuffer[i], 128);
+    }
+    strncpy(espNowBuffer[9], formattedData.c_str(), 127);
+    espNowBuffer[9][127] = '\0';
+  }
+
+  // 2. Try sending everything in the buffer (oldest first)
+  int successfulSends = 0;
+  for (int i = 0; i < espNowBufferCount; i++) {
+    if (sendData(String(espNowBuffer[i]))) {
+      successfulSends++;
+    } else {
+      break;  // Stop on first failure, leave rest in buffer for next cycle
+    }
+  }
+
+  // 3. Remove successful sends from buffer
+  if (successfulSends > 0) {
+    int remaining = espNowBufferCount - successfulSends;
+    for (int i = 0; i < remaining; i++) {
+      strncpy(espNowBuffer[i], espNowBuffer[i + successfulSends], 128);
+    }
+    espNowBufferCount = remaining;
+  }
 
   // Clear the serial buffer, turn off modems
   Serial.flush();
@@ -138,7 +158,7 @@ void setup() {
   delay(50);
 
   // Go to sleep for 30sec
-  Serial.println("Going to sleep now.");
+  // Serial.println("Going to sleep now.");
   esp32DeepSleep(SLEEP_SECONDS);
 }
 
@@ -148,8 +168,8 @@ int loopCounter = 0;
 void loop() {
   loopCounter++;
   if (loopCounter >= 1000) {
-    Serial.println(
-        "Safety catch triggered: Trapped in loop, forcing deep sleep!");
+    // Serial.println(
+    //     "Safety catch triggered: Trapped in loop, forcing deep sleep!");
     esp32DeepSleep(SLEEP_SECONDS);
   }
   delay(10);  // Prevent watchdog timeout while looping

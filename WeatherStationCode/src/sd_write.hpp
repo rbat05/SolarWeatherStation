@@ -10,8 +10,6 @@ struct Readings {
   float temperature;
   float humidity;
   float pressure;
-  float windSpeed;
-  String windDirection;
   float batteryVoltage;
   float batteryPercentage;
 };

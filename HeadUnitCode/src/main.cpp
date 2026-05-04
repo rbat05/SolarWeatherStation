@@ -1,44 +1,66 @@
 #include <Arduino.h>
-#include <Arduino_JSON.h>
+#include <ESP8266HTTPClient.h>
+#include <ESP8266WebServer.h>
 #include <ESP8266WiFi.h>
+#include <WiFiClient.h>
 #include <espnow.h>
+#include <user_interface.h>
 
-#include <iostream>
-
-#include "ESPAsyncTCP.h"
-#include "ESPAsyncWebServer.h"
 #include "config.hpp"
-#include "ds3231_live.hpp"
-#include "sd_read_write.hpp"
-#include "ssd1306_display.hpp"
-#include "webserver.hpp"
-
-// Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
-#define SCREEN_WIDTH 128  // OLED display width, in pixels
-#define SCREEN_HEIGHT 64  // OLED display height, in pixels
-#define OLED_RESET -1     // Reset pin # (or -1 if sharing Arduino reset pin)
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
-
-// Declaration for an RTC DS3231 object
-RTC_DS3231 rtc;
-
-// Declaration for a LatestReadings object, holds the latest readings
-LatestReadings latest_readings;
-
-// Declaration for a TimeDifference object, holds the time difference between
-// the latest reading and the current time
-TimeDifference timeDifference;
-
-// String to hold the latest reading update, recieved through ESPNOW
-String LATEST_READING_UPDATE;
-
-// AsyncWebServer on port 80
-AsyncWebServer server(80);
 
 volatile bool dataReceived = false;
+String incomingDataString = "";
+
+// Health Server & Buffer Variables
+ESP8266WebServer server(80);
+const int MAX_BUFFER_SIZE = 100;
+String offlineBuffer[MAX_BUFFER_SIZE];
+int bufferCount = 0;
+
+unsigned long packetsReceived = 0;
+int lastHttpResponse = 0;
+unsigned long lastPostAttempt = 0;
+const unsigned long POST_RETRY_INTERVAL = 5000;
+
+// --- UPDATE WITH YOUR RASPBERRY PI IP ---
+const char* serverName = "http://192.168.1.100:5000/api/weather";
+
+void handleRoot() {
+  String html = "<!DOCTYPE html><html><head><title>Relay Health</title>";
+  html +=
+      "<meta name=\"viewport\" content=\"width=device-width, "
+      "initial-scale=1\">";
+  html +=
+      "<style>body{font-family:Arial; margin:2rem; background-color:#121212; "
+      "color:#ffffff;}";
+  html +=
+      ".stat{font-size:1.2rem; margin-bottom:10px; padding:10px; "
+      "background:#1e1e1e; border-radius:5px;}</style></head><body>";
+  html += "<h1>Weather Station Relay Health</h1>";
+
+  unsigned long uptimeSeconds = millis() / 1000;
+  int days = uptimeSeconds / 86400;
+  int hours = (uptimeSeconds % 86400) / 3600;
+  int mins = (uptimeSeconds % 3600) / 60;
+  int secs = uptimeSeconds % 60;
+
+  html += "<div class=\"stat\"><b>Uptime:</b> " + String(days) + "d " +
+          String(hours) + "h " + String(mins) + "m " + String(secs) + "s</div>";
+  html += "<div class=\"stat\"><b>WiFi RSSI:</b> " + String(WiFi.RSSI()) +
+          " dBm</div>";
+  html += "<div class=\"stat\"><b>ESP-NOW Packets Received:</b> " +
+          String(packetsReceived) + "</div>";
+  html += "<div class=\"stat\"><b>Last HTTP Response Code:</b> " +
+          String(lastHttpResponse) + "</div>";
+  html += "<div class=\"stat\"><b>Offline Buffer Status:</b> " +
+          String(bufferCount) + " / " + String(MAX_BUFFER_SIZE) + "</div>";
+
+  html += "</body></html>";
+  server.send(200, "text/html", html);
+}
 
 // Callback function that will be executed when data is received
-void onDataReceived(uint8_t *senderMac, uint8_t *incomingData, uint8_t len) {
+void onDataReceived(uint8_t* senderMac, uint8_t* incomingData, uint8_t len) {
   // Write the incoming data to the uint8_t array
   uint8_t recieved[len + 1];
 
@@ -52,32 +74,21 @@ void onDataReceived(uint8_t *senderMac, uint8_t *incomingData, uint8_t len) {
   recieved[len] = '\0';
 
   // Convert the uint8_t array to a String
-  String recievedString = String((char *)recieved);
-  // Write the latest reading to the SD card
-  sdWriteLatestReading(getFilename(rtc), recievedString);
+  incomingDataString = String((char*)recieved);
   dataReceived = true;
 }
 
 void setup() {
   Serial.begin(115200);
+  Serial.println("\nStarting Head Unit Relay...");
 
-  // Peripherals setup
-  ssd1306DisplaySetup(display);
-  setupDS3231(rtc);
-  sdReadSetup();
-
-  // Clear the display
-  ssd1306DisplayClear(display);
-
-  // ESPNOW setup
   // Set device as a Wi-Fi Station
   WiFi.mode(WIFI_AP_STA);
-  // WiFi.disconnect(); // ESPNOW OLD
   WiFi.begin(ssid, password);
 
   while (WiFi.status() != WL_CONNECTED) {
     delay(1000);
-    Serial.println("Setting as a Wi-Fi Station..");
+    Serial.println("Connecting to Wi-Fi...");
   }
 
   Serial.print("Station IP Address: ");
@@ -87,101 +98,85 @@ void setup() {
 
   // Print MAC address of the receiver
   Serial.print("Receiver MAC: ");
-  for (int i = 0; i < 6; i++) {
-    Serial.print(WiFi.macAddress()[i], HEX);
-    if (i < 5) {
-      Serial.print(":");
-    }
-  }
+  Serial.println(WiFi.macAddress());
 
-  Serial.println();
   // Initialize ESP-NOW
   if (esp_now_init() != 0) {
     Serial.println("Error initializing ESP-NOW");
     return;
   }
 
-  // Serve the landing page
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send(SDFS, "/index.html", "text/html");
-  });
+  // Force receive channel to 1
+  wifi_set_channel(1);
 
-  server.serveStatic("/", SDFS, "/");
-
-  // Get todays filename
-  String filename = getFilename(rtc);
-
-  // Get the latest readings from the SD card, store into latest_readings struct
-  sdReadGetLastLine(filename);
-  sdReadGetLatestReadings(latest_readings);
-  sdUpdateWebpage(latest_readings, filename);
+  // Setup Health Web Server
+  server.on("/", handleRoot);
   server.begin();
 
   // Register callback for receiving data
   esp_now_set_self_role(ESP_NOW_ROLE_SLAVE);  // ESPNOW OLD
   esp_now_register_recv_cb(onDataReceived);
+
+  Serial.println("Setup complete. Waiting for data...");
 }
 
 void loop() {
-  // Get the current day date and time
-  String dayDate = getDayDate(rtc);
-  String time = getTime(rtc);
+  // Listen for incoming HTTP requests to the health dashboard
+  server.handleClient();
 
-  // Refreshes line 2 & line 8 only
-  int x, y;
-  for (y = 7; y <= 14; y++) {
-    for (x = 0; x < 127; x++) {
-      display.drawPixel(x, y, BLACK);
-    }
-  }
-  for (y = 56; y <= 63; y++) {
-    for (x = 0; x < 127; x++) {
-      display.drawPixel(x, y, BLACK);
-    }
-  }
-
-  // Get the time difference between the latest reading and the current time
-  timeDifference =
-      getTimeDifference(rtc, latest_readings.time, latest_readings.dayDate);
-
-  // Display the live time and the time difference between now and the last
-  // reading
-  ssd1306DisplayLiveTime(display, dayDate, time, timeDifference.hours,
-                         timeDifference.minutes, timeDifference.seconds);
-
-  // Get todays filename
-  String filename = getFilename(rtc);
-
-  // Get the latest readings from the SD card, store into latest_readings struct
-  sdReadGetLastLine(filename);
-  sdReadGetLatestReadings(latest_readings);
   if (dataReceived == true) {
-    sdUpdateWebpage(latest_readings, filename);
-    display.clearDisplay();
+    packetsReceived++;
+
+    // Store reading in the buffer
+    if (bufferCount < MAX_BUFFER_SIZE) {
+      offlineBuffer[bufferCount++] = incomingDataString;
+    } else {
+      // Buffer full: shift everything left (drop oldest) to make room for
+      // newest
+      for (int i = 1; i < MAX_BUFFER_SIZE; i++) {
+        offlineBuffer[i - 1] = offlineBuffer[i];
+      }
+      offlineBuffer[MAX_BUFFER_SIZE - 1] = incomingDataString;
+    }
+
     dataReceived = false;
     Serial.flush();
-    Serial.println("Data received set to false.");
   }
-  // Serial.println("Setup complete.");
-  // Serial.println("Temperature: " + String(latest_readings.temperature));
-  // Serial.println("Humidity: " + String(latest_readings.humidity));
-  // Serial.println("Pressure: " + String(latest_readings.pressure));
-  // Serial.println("Wind Speed: " + String(latest_readings.windSpeed));
-  // Serial.println("Wind Direction: " + latest_readings.windDirection);
-  // Serial.println("Battery Percentage: " +
-  //                String(latest_readings.batteryPercentage));
-  // Serial.println("Day Date: " + latest_readings.dayDate);
-  // Serial.println("Time: " + latest_readings.time);
-  // Serial.println("Time Difference: " + String(timeDifference.hours) +
-  //                " hours " + String(timeDifference.minutes) + " minutes " +
-  //                String(timeDifference.seconds) + " seconds");
 
-  // Display the latest readings on the OLED display
-  ssd1306DisplayReadings(
-      display, latest_readings.temperature, latest_readings.humidity,
-      latest_readings.pressure, latest_readings.windSpeed,
-      latest_readings.windDirection, latest_readings.batteryPercentage);
+  // If we have buffered data, try to send it (rate-limited to avoid spamming a
+  // dead server)
+  if (bufferCount > 0 && (millis() - lastPostAttempt > POST_RETRY_INTERVAL)) {
+    if (WiFi.status() == WL_CONNECTED) {
+      lastPostAttempt = millis();
+      WiFiClient client;
+      HTTPClient http;
 
-  // Serial.print("Free heap memory: ");
-  // Serial.println(ESP.getFreeHeap());
+      http.begin(client, serverName);
+      http.addHeader("Content-Type", "text/plain");
+
+      int httpResponseCode = http.POST(offlineBuffer[0]);
+      lastHttpResponse = httpResponseCode;
+
+      if (httpResponseCode > 0) {
+        Serial.print("HTTP POST Success, Code: ");
+        Serial.println(httpResponseCode);
+
+        // Successfully reached server, remove from buffer
+        for (int i = 1; i < bufferCount; i++) {
+          offlineBuffer[i - 1] = offlineBuffer[i];
+        }
+        bufferCount--;
+
+        // If success code, immediately trigger next loop to blast remaining
+        // backlog
+        if (httpResponseCode == 200) lastPostAttempt = 0;
+      } else {
+        Serial.print("HTTP POST Error: ");
+        Serial.println(httpResponseCode);
+      }
+      http.end();
+    } else {
+      // If WiFi is disconnected, silently wait and try again later
+    }
+  }
 }
