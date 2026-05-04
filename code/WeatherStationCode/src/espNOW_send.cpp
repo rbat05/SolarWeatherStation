@@ -1,11 +1,16 @@
 #include "espNOW_send.hpp"
 
+#include <esp_wifi.h>
+
 // Relay ESP8266 permanent MAC address
 uint8_t receiverAddress[] = {0x2c, 0x3a, 0xe8, 0x08, 0xdb, 0x6a};
 
 volatile bool espNowDeliverySuccess = false;
 volatile bool espNowDeliveryComplete = false;
 bool espNowInitialized = false;
+
+// Remember the last successful channel across deep sleep
+RTC_DATA_ATTR uint8_t currentEspNowChannel = 1;
 
 // Callback function when data is sent
 void onDataSent(const uint8_t* mac_addr, esp_now_send_status_t status) {
@@ -44,7 +49,7 @@ bool sendData(String data) {
     esp_now_peer_info_t peerInfo;
     memset(&peerInfo, 0, sizeof(peerInfo));
     memcpy(peerInfo.peer_addr, receiverAddress, 6);
-    peerInfo.channel = 6;  // Use a fixed channel (e.g., 1, 6, or 11)
+    peerInfo.channel = currentEspNowChannel;
     peerInfo.encrypt = false;
 
     // Try to add peer to ESP-NOW
@@ -57,14 +62,43 @@ bool sendData(String data) {
   uint8_t send[data.length() + 1];
   data.getBytes(send, data.length() + 1);
 
-  // Send data
-  if (esp_now_send(receiverAddress, send, sizeof(send)) != ESP_OK) return false;
+  // Loop through Wi-Fi channels 1 to 11 to find the Relay
+  for (int i = 0; i < 11; i++) {
+    espNowDeliverySuccess = false;
+    espNowDeliveryComplete = false;
 
-  // Wait max 500ms for hardware ACK from receiver
-  unsigned long startWait = millis();
-  while (!espNowDeliveryComplete && millis() - startWait < 500) {
-    delay(10);
+    // Force ESP32 local radio to the current test channel
+    esp_wifi_set_promiscuous(true);
+    esp_wifi_set_channel(currentEspNowChannel, WIFI_SECOND_CHAN_NONE);
+    esp_wifi_set_promiscuous(false);
+
+    // Update the peer information to the current test channel
+    esp_now_peer_info_t peerInfo;
+    memset(&peerInfo, 0, sizeof(peerInfo));
+    memcpy(peerInfo.peer_addr, receiverAddress, 6);
+    peerInfo.channel = currentEspNowChannel;
+    peerInfo.encrypt = false;
+    esp_now_mod_peer(&peerInfo);
+
+    // Send data
+    if (esp_now_send(receiverAddress, send, sizeof(send)) == ESP_OK) {
+      // Wait max 500ms for hardware ACK from receiver
+      unsigned long startWait = millis();
+      while (!espNowDeliveryComplete && millis() - startWait < 500) {
+        delay(10);
+      }
+
+      if (espNowDeliverySuccess) {
+        return true;  // Success! It will use this channel next time.
+      }
+    }
+
+    // Transmission failed (no ACK), jump to the next channel
+    currentEspNowChannel++;
+    if (currentEspNowChannel > 11) {
+      currentEspNowChannel = 1;
+    }
   }
 
-  return espNowDeliverySuccess;
+  return false;  // Failed on all 11 channels
 }

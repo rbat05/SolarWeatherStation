@@ -37,7 +37,7 @@ void handleRoot() {
   html +=
       ".stat{font-size:1.2rem; margin-bottom:10px; padding:10px; "
       "background:#1e1e1e; border-radius:5px;}</style></head><body>";
-  html += "<h1>Weather Station Relay Health</h1>";
+  html += "<h1>Weather Station Relay Health OTA TEST</h1>";
 
   unsigned long uptimeSeconds = millis() / 1000;
   int days = uptimeSeconds / 86400;
@@ -49,6 +49,8 @@ void handleRoot() {
           String(hours) + "h " + String(mins) + "m " + String(secs) + "s</div>";
   html += "<div class=\"stat\"><b>WiFi RSSI:</b> " + String(WiFi.RSSI()) +
           " dBm</div>";
+  html += "<div class=\"stat\"><b>WiFi Channel:</b> " + String(WiFi.channel()) +
+          "</div>";
   html += "<div class=\"stat\"><b>ESP-NOW Packets Received:</b> " +
           String(packetsReceived) + "</div>";
   html += "<div class=\"stat\"><b>Last HTTP Response Code:</b> " +
