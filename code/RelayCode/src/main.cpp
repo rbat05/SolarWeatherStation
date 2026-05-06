@@ -21,10 +21,13 @@ int bufferCount = 0;
 unsigned long packetsReceived = 0;
 int lastHttpResponse = 0;
 unsigned long lastPostAttempt = 0;
+unsigned long firstPacketTime = 0;
+bool firstPacketReceived = false;
 const unsigned long POST_RETRY_INTERVAL = 5000;
 
-// --- UPDATE WITH YOUR RASPBERRY PI IP ---
-const char* serverName = "http://192.168.1.100:5000/api/weather";
+// --- UPDATE WITH YOUR COMPUTER IP ---
+const char* serverName =
+    "http://192.168.68.63:5000/ingest";  // Replaced /api/weather with /ingest
 
 void handleRoot() {
   String html = "<!DOCTYPE html><html><head><title>Relay Health</title>";
@@ -57,6 +60,18 @@ void handleRoot() {
           (incomingDataString == "" ? "None" : incomingDataString) + "</div>";
   html += "<div class=\"stat\"><b>Last HTTP Response Code:</b> " +
           String(lastHttpResponse) + "</div>";
+
+  String lossStr = "--";
+  if (firstPacketReceived) {
+    unsigned long elapsedSec = (millis() - firstPacketTime) / 1000;
+    unsigned long expected = (elapsedSec / 30) + 1;
+    float loss = 100.0 * (1.0 - ((float)packetsReceived / expected));
+    if (loss < 0) loss = 0;
+    lossStr = String(loss, 1) + "% (" + String(expected) + " expected)";
+  }
+  html +=
+      "<div class=\"stat\"><b>Rolling Packet Loss:</b> " + lossStr + "</div>";
+
   html += "<div class=\"stat\"><b>Offline Buffer Status:</b> " +
           String(bufferCount) + " / " + String(MAX_BUFFER_SIZE) + "</div>";
 
@@ -154,6 +169,11 @@ void loop() {
   if (dataReceived == true) {
     packetsReceived++;
 
+    if (!firstPacketReceived) {
+      firstPacketReceived = true;
+      firstPacketTime = millis();
+    }
+
     // Store reading in the buffer
     if (bufferCount < MAX_BUFFER_SIZE) {
       offlineBuffer[bufferCount++] = incomingDataString;
@@ -196,7 +216,8 @@ void loop() {
 
         // If success code, immediately trigger next loop to blast remaining
         // backlog
-        if (httpResponseCode == 200) lastPostAttempt = 0;
+        if (httpResponseCode == 200 || httpResponseCode == 201)
+          lastPostAttempt = 0;
       } else {
         Serial.print("HTTP POST Error: ");
         Serial.println(httpResponseCode);

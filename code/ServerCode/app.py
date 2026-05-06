@@ -66,7 +66,14 @@ def init_db():
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 
 def parse_reading_line(line: str, source: str = "live") -> dict | None:
-    """Parse a CSV line in format: Day DD/MM/YYYY - HH:MM:SS,temp,hum,pres,volt,pct"""
+    """
+    Parse a CSV line. Supports multiple timestamp formats:
+      Mon 10/02/2025 - 13:38:57    (station default)
+      Mon 10/02/2025 13:38:57      (no dash)
+      10/02/2025 - 13:38:57        (no day name)
+      2025-02-10T13:38:57          (ISO)
+      2025-02-10 13:38:57          (ISO with space)
+    """
     line = line.strip()
     if not line or line.startswith("#"):
         return None
@@ -74,21 +81,34 @@ def parse_reading_line(line: str, source: str = "live") -> dict | None:
     if len(parts) < 6:
         return None
     try:
-        # Parse datetime: "Mon 10/02/2025 - 13:38:57"
         dt_str = parts[0].strip()
-        # Remove day-of-week prefix
-        # Format: "Mon 10/02/2025 - 13:38:57"
-        m = re.match(r'\w+\s+(\d{2}/\d{2}/\d{4})\s+-\s+(\d{2}:\d{2}:\d{2})', dt_str)
-        if not m:
+
+        # (pattern, date_fmt) pairs — tried in order
+        patterns = [
+            (r'\w[\w\s]*\s+(\d{2}/\d{2}/\d{4})\s+-\s+(\d{2}:\d{2}:\d{2})', "%d/%m/%Y"),  # Mon 10/02/2025 - HH:MM:SS
+            (r'\w[\w\s]*\s+(\d{2}/\d{2}/\d{4})\s+(\d{2}:\d{2}:\d{2})',       "%d/%m/%Y"),  # Mon 10/02/2025 HH:MM:SS
+            (r'(\d{2}/\d{2}/\d{4})\s+-\s+(\d{2}:\d{2}:\d{2})',                "%d/%m/%Y"),  # 10/02/2025 - HH:MM:SS
+            (r'(\d{2}/\d{2}/\d{4})\s+(\d{2}:\d{2}:\d{2})',                    "%d/%m/%Y"),  # 10/02/2025 HH:MM:SS
+            (r'(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})',                      "%Y-%m-%d"),  # ISO T
+            (r'(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})',                    "%Y-%m-%d"),  # ISO space
+        ]
+
+        dt = None
+        for pat, date_fmt in patterns:
+            m = re.match(pat, dt_str)
+            if m:
+                try:
+                    dt = datetime.strptime(f"{m.group(1)} {m.group(2)}", f"{date_fmt} %H:%M:%S")
+                    break
+                except ValueError:
+                    continue
+
+        if dt is None:
             return None
-        date_part = m.group(1)  # DD/MM/YYYY
-        time_part = m.group(2)  # HH:MM:SS
-        dt = datetime.strptime(f"{date_part} {time_part}", "%d/%m/%Y %H:%M:%S")
-        day_date = dt.strftime("%Y-%m-%d")
 
         return {
             "timestamp": dt.isoformat(),
-            "day_date": day_date,
+            "day_date": dt.strftime("%Y-%m-%d"),
             "temperature": float(parts[1]),
             "humidity": float(parts[2]),
             "pressure": float(parts[3]),
@@ -165,19 +185,33 @@ def days_with_data(n_days: int, today_str: str) -> list[str]:
 
 # ─── MetService Integration ───────────────────────────────────────────────────
 
-def fetch_metservice_current(location: str = "auckland") -> dict | None:
+_metservice_cache: dict | None = None
+_metservice_cache_time: datetime | None = None
+_METSERVICE_TTL_SECONDS = 600  # 10 minutes
+
+def fetch_metservice_current(location: str = "wellington") -> dict | None:
     """
-    Attempts to fetch current conditions from Open-Meteo (free, no key needed).
-    Defaults to Auckland, NZ.
+    Fetches current conditions from Open-Meteo (free, no key needed).
+    Results are cached for TTL seconds so the Today tab doesn't re-hit
+    the API on every auto-refresh.
     """
-    # Location coords mapping
+    global _metservice_cache, _metservice_cache_time
+
+    now = datetime.now()
+    if (
+        _metservice_cache is not None
+        and _metservice_cache_time is not None
+        and (now - _metservice_cache_time).total_seconds() < _METSERVICE_TTL_SECONDS
+    ):
+        return _metservice_cache
+
     locations = {
         "wellington": (-41.2865, 174.7762),
         "auckland": (-36.8485, 174.7633),
         "christchurch": (-43.5321, 172.6362),
         "hamilton": (-37.7870, 175.2793),
     }
-    lat, lon = locations.get(location.lower(), locations["auckland"])
+    lat, lon = locations.get(location.lower(), locations["wellington"])
     try:
         url = (
             f"https://api.open-meteo.com/v1/forecast"
@@ -188,16 +222,19 @@ def fetch_metservice_current(location: str = "auckland") -> dict | None:
         resp = requests.get(url, timeout=5)
         data = resp.json()
         cur = data.get("current", {})
-        return {
+        result = {
             "temperature": cur.get("temperature_2m"),
             "humidity": cur.get("relative_humidity_2m"),
             "pressure": cur.get("surface_pressure"),
             "wind_speed": cur.get("wind_speed_10m"),
             "location": location.title(),
-            "fetched_at": datetime.now().isoformat()
+            "fetched_at": now.isoformat()
         }
+        _metservice_cache = result
+        _metservice_cache_time = now
+        return result
     except Exception:
-        return None
+        return _metservice_cache  # return stale cache on error rather than None
 
 # ─── Routes: Data Ingest ──────────────────────────────────────────────────────
 
@@ -296,7 +333,7 @@ def api_today():
     readings = readings_for_day(today)
     stats = stats_for_day(today)
     latest = latest_reading()
-    metservice = fetch_metservice_current("auckland")
+    metservice = fetch_metservice_current("wellington")
     return jsonify({
         "date": today,
         "latest": latest,
@@ -594,6 +631,48 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .chart-container { position: relative; height: 200px; }
   .chart-container.tall { height: 280px; }
 
+  /* Expand button — shown on card hover */
+  .chart-card { position: relative; }
+  .expand-btn {
+    position: absolute; top: 12px; right: 12px;
+    background: rgba(30,45,69,0.9); border: 1px solid var(--border);
+    color: var(--text-dim); padding: 4px 8px; border-radius: 5px;
+    font-size: 11px; cursor: pointer; font-family: var(--mono);
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.15s, color 0.15s;
+    z-index: 10;
+  }
+  .chart-card:hover .expand-btn { opacity: 1; pointer-events: auto; }
+  .expand-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+  /* Expand modal */
+  #expand-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.82); z-index: 1000;
+    align-items: center; justify-content: center;
+    backdrop-filter: blur(4px);
+  }
+  #expand-overlay.open { display: flex; }
+  #expand-modal {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 20px;
+    width: min(92vw, 1100px); height: min(80vh, 640px);
+    display: flex; flex-direction: column;
+    animation: fadeIn 0.2s ease;
+  }
+  #expand-modal-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  #expand-modal-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--text-dim); font-family: var(--mono); }
+  #expand-close-btn {
+    background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+    border-radius: 6px; padding: 5px 12px; font-family: var(--mono); font-size: 12px;
+    cursor: pointer;
+  }
+  #expand-close-btn:hover { border-color: var(--danger); color: var(--danger); }
+  #expand-chart-wrap { flex: 1; position: relative; min-height: 0; }
+
   /* MetService comparison */
   .compare-grid {
     display: grid; grid-template-columns: 1fr 1fr;
@@ -836,10 +915,24 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
 </div>
 
+<!-- Expand Modal -->
+<div id="expand-overlay" onclick="closeExpand(event)">
+  <div id="expand-modal">
+    <div id="expand-modal-header">
+      <span id="expand-modal-title">Chart</span>
+      <button id="expand-close-btn" onclick="closeExpand()">✕ Close</button>
+    </div>
+    <div id="expand-chart-wrap">
+      <canvas id="expand-canvas"></canvas>
+    </div>
+  </div>
+</div>
+
 <script>
 let activeTab = 'today';
 let charts = {};
 let refreshInterval = null;
+let expandChart = null;
 
 // ─── Clock ────────────────────────────────────────────────────────────────────
 function updateClock() {
@@ -897,61 +990,165 @@ function delta(a, b) {
   return `<span class="delta ${cls}">${sign}${d.toFixed(1)}</span>`;
 }
 
-// ─── Chart Builder ─────────────────────────────────────────────────────────────
+// ─── Chart Card HTML helper ────────────────────────────────────────────────────
+// Returns the outer card HTML with an embedded expand button.
+// The canvas ID is derived from the supplied id.
+function chartCard(id, title, unitLabel, tall=false) {
+  return `
+    <div class="card chart-card" style="position:relative;">
+      <div class="card-header">
+        <span class="card-title">${title}</span>
+        <span class="ts">${unitLabel}</span>
+      </div>
+      <div class="chart-container${tall?' tall':''}">
+        <canvas id="${id}"></canvas>
+      </div>
+      <button class="expand-btn" onclick="expandChart('${id}','${title}')">⤢ Expand</button>
+    </div>`;
+}
+
+// ─── Expand Modal ──────────────────────────────────────────────────────────────
+// Store of { canvasId → {labels, datasets, options, type} } so we can clone into the modal
+const chartDefs = {};
+
+function expandChart(sourceId, title) {
+  const def = chartDefs[sourceId];
+  if (!def) return;
+
+  document.getElementById('expand-modal-title').textContent = title;
+  document.getElementById('expand-overlay').classList.add('open');
+
+  if (expandChart._instance) {
+    try { expandChart._instance.destroy(); } catch(e) {}
+    expandChart._instance = null;
+  }
+
+  // Replace canvas to avoid Chart.js "already in use" error
+  const wrap = document.getElementById('expand-chart-wrap');
+  wrap.innerHTML = '<canvas id="expand-canvas"></canvas>';
+
+  const ctx = document.getElementById('expand-canvas');
+  const opts = JSON.parse(JSON.stringify(def.options)); // deep clone
+  // Larger font for the modal
+  if (opts.scales?.x?.ticks) opts.scales.x.ticks.font = { family: 'Share Tech Mono', size: 11 };
+  if (opts.scales?.y?.ticks) opts.scales.y.ticks.font = { family: 'Share Tech Mono', size: 11 };
+  if (opts.plugins?.legend?.labels) opts.plugins.legend.labels.font = { family: 'Share Tech Mono', size: 12 };
+
+  expandChart._instance = new Chart(ctx, {
+    type: def.type,
+    data: { labels: def.labels, datasets: def.datasets },
+    options: opts
+  });
+}
+
+function closeExpand(e) {
+  if (e && e.target !== document.getElementById('expand-overlay')) return;
+  document.getElementById('expand-overlay').classList.remove('open');
+  if (expandChart._instance) {
+    try { expandChart._instance.destroy(); } catch(e2) {}
+    expandChart._instance = null;
+  }
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeExpand(); });
+// Close btn (direct click from button, no event target check needed)
+document.getElementById('expand-close-btn').addEventListener('click', () => {
+  document.getElementById('expand-overlay').classList.remove('open');
+  if (expandChart._instance) { try { expandChart._instance.destroy(); } catch(e){} expandChart._instance = null; }
+});
+
+// ─── Chart Builders ────────────────────────────────────────────────────────────
+function _baseLineOptions(options) {
+  return {
+    responsive: true, maintainAspectRatio: false,
+    animation: { duration: 400 },
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: (options._datasetCount||1) > 1, labels: { color: '#64748b', font: { family: 'Share Tech Mono', size: 11 }, boxWidth: 12, padding: 16 } },
+      tooltip: {
+        backgroundColor: '#111827', borderColor: '#1e2d45', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8',
+        titleFont: { family: 'Share Tech Mono' }, bodyFont: { family: 'Share Tech Mono', size: 11 },
+        callbacks: options._tooltipCallback || { label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y != null ? ctx.parsed.y.toFixed(2) : '—'}${options.unit||''}` }
+      }
+    },
+    scales: {
+      x: {
+        ticks: { color: '#334155', font: { family: 'Share Tech Mono', size: 10 }, maxTicksLimit: 12, maxRotation: 0 },
+        grid: { color: '#1e2d45' }
+      },
+      y: {
+        ticks: { color: '#334155', font: { family: 'Share Tech Mono', size: 10 } },
+        grid: { color: '#1e2d45' },
+        ...(options.yScale||{})
+      }
+    }
+  };
+}
+
 function buildLineChart(canvasId, labels, datasets, options={}) {
   const ctx = document.getElementById(canvasId);
   if (!ctx) return;
-  const c = new Chart(ctx, {
-    type: 'line',
-    data: { labels, datasets },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      animation: { duration: 400 },
-      interaction: { mode: 'index', intersect: false },
-      plugins: {
-        legend: { display: datasets.length > 1, labels: { color: '#64748b', font: { family: 'Share Tech Mono', size: 11 }, boxWidth: 12, padding: 16 } },
-        tooltip: {
-          backgroundColor: '#111827', borderColor: '#1e2d45', borderWidth: 1,
-          titleColor: '#e2e8f0', bodyColor: '#94a3b8',
-          titleFont: { family: 'Share Tech Mono' }, bodyFont: { family: 'Share Tech Mono', size: 11 },
-          callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y != null ? ctx.parsed.y.toFixed(2) : '—'}${options.unit||''}` }
-        }
-      },
-      scales: {
-        x: {
-          ticks: { color: '#334155', font: { family: 'Share Tech Mono', size: 10 }, maxTicksLimit: 12, maxRotation: 0 },
-          grid: { color: '#1e2d45' }
-        },
-        y: {
-          ticks: { color: '#334155', font: { family: 'Share Tech Mono', size: 10 } },
-          grid: { color: '#1e2d45' },
-          ...options.yScale
+  const opts = _baseLineOptions({...options, _datasetCount: datasets.length});
+  const c = new Chart(ctx, { type: 'line', data: { labels, datasets }, options: opts });
+  charts[canvasId] = c;
+  chartDefs[canvasId] = { type: 'line', labels, datasets, options: opts };
+}
+
+function buildBatteryChart(canvasId, labels, pctData, voltData) {
+  const ctx = document.getElementById(canvasId);
+  if (!ctx) return;
+  const opts = {
+    responsive: true, maintainAspectRatio: false,
+    animation: { duration: 400 },
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#111827', borderColor: '#1e2d45', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8',
+        titleFont: { family: 'Share Tech Mono' }, bodyFont: { family: 'Share Tech Mono', size: 11 },
+        callbacks: {
+          label: ctx => {
+            const idx = ctx.dataIndex;
+            const pct = pctData[idx];
+            const volt = voltData[idx];
+            return ` ${pct != null ? pct.toFixed(1) : '—'}% (${volt != null ? volt.toFixed(2) : '—'}V)`;
+          }
         }
       }
+    },
+    scales: {
+      x: { ticks: { color: '#334155', font: { family: 'Share Tech Mono', size: 10 }, maxTicksLimit: 12, maxRotation: 0 }, grid: { color: '#1e2d45' } },
+      y: { ticks: { color: '#334155', font: { family: 'Share Tech Mono', size: 10 }, callback: v => v + '%' }, grid: { color: '#1e2d45' }, min: 0, max: 100 }
     }
-  });
+  };
+  const datasets = [{
+    label: 'Battery',
+    data: pctData,
+    borderColor: '#ffa502',
+    backgroundColor: 'rgba(255,165,2,0.15)',
+    borderWidth: 1.5, tension: 0.4, pointRadius: 0, fill: true
+  }];
+  const c = new Chart(ctx, { type: 'line', data: { labels, datasets }, options: opts });
   charts[canvasId] = c;
+  chartDefs[canvasId] = { type: 'line', labels, datasets, options: opts };
 }
 
 function buildBarChart(canvasId, labels, data, color, unit='') {
   const ctx = document.getElementById(canvasId);
   if (!ctx) return;
-  const c = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels,
-      datasets: [{ data, backgroundColor: color + '66', borderColor: color, borderWidth: 1, borderRadius: 3 }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false }, tooltip: { bodyFont: { family: 'Share Tech Mono' }, callbacks: { label: ctx => ` ${ctx.parsed.y.toFixed(1)}${unit}` } } },
-      scales: {
-        x: { ticks: { color: '#334155', font: { family: 'Share Tech Mono', size: 10 } }, grid: { color: '#1e2d45' } },
-        y: { ticks: { color: '#334155', font: { family: 'Share Tech Mono', size: 10 } }, grid: { color: '#1e2d45' } }
-      }
+  const opts = {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false }, tooltip: { bodyFont: { family: 'Share Tech Mono' }, callbacks: { label: ctx => ` ${ctx.parsed.y.toFixed(1)}${unit}` } } },
+    scales: {
+      x: { ticks: { color: '#334155', font: { family: 'Share Tech Mono', size: 10 } }, grid: { color: '#1e2d45' } },
+      y: { ticks: { color: '#334155', font: { family: 'Share Tech Mono', size: 10 } }, grid: { color: '#1e2d45' } }
     }
-  });
+  };
+  const datasets = [{ data, backgroundColor: color + '66', borderColor: color, borderWidth: 1, borderRadius: 3 }];
+  const c = new Chart(ctx, { type: 'bar', data: { labels, datasets }, options: opts });
   charts[canvasId] = c;
+  chartDefs[canvasId] = { type: 'bar', labels, datasets, options: opts };
 }
 
 // ─── TODAY ─────────────────────────────────────────────────────────────────────
@@ -1007,23 +1204,14 @@ async function loadToday() {
       </div>
 
       <div class="grid-2 section">
-        <div class="card">
-          <div class="card-header"><span class="card-title">Temperature Today</span><span class="ts">°C</span></div>
-          <div class="chart-container"><canvas id="ch-temp-today"></canvas></div>
-        </div>
-        <div class="card">
-          <div class="card-header"><span class="card-title">Humidity Today</span><span class="ts">%</span></div>
-          <div class="chart-container"><canvas id="ch-hum-today"></canvas></div>
-        </div>
-      </div>
-
-      <div class="card section">
-        <div class="card-header"><span class="card-title">Pressure Today</span><span class="ts">hPa</span></div>
-        <div class="chart-container"><canvas id="ch-pres-today"></canvas></div>
+        ${chartCard('ch-temp-today','Temperature Today','°C')}
+        ${chartCard('ch-hum-today','Humidity Today','%')}
+        ${chartCard('ch-pres-today','Pressure Today','hPa')}
+        ${chartCard('ch-bat-today','Battery Today','%')}
       </div>
 
       <div class="section">
-        <div class="card-title" style="margin-bottom:12px;">MetService Comparison — Auckland</div>
+        <div class="card-title" style="margin-bottom:12px;">MetService Comparison — Wellington</div>
         ${met ? `
         <div class="compare-grid">
           <div class="compare-col">
@@ -1033,7 +1221,7 @@ async function loadToday() {
             <div class="compare-row"><span class="compare-key">Pressure</span><span class="compare-val" style="color:var(--accent3)">${fmt(live?.pressure, 0)} hPa</span></div>
           </div>
           <div class="compare-col">
-            <div class="compare-title">🌐 Open-Meteo (Auckland)</div>
+            <div class="compare-title">🌐 Open-Meteo (Wellington)</div>
             <div class="compare-row">
               <span class="compare-key">Temperature</span>
               <span class="compare-val">${fmt(met.temperature)}°C</span>
@@ -1060,6 +1248,7 @@ async function loadToday() {
       buildLineChart('ch-temp-today', times, [{label:'Temp', data:temps, borderColor:'#ff6b35', backgroundColor:'rgba(255,107,53,0.1)', borderWidth:1.5, tension:0.4, pointRadius:0}], {unit:'°C'});
       buildLineChart('ch-hum-today', times, [{label:'Hum', data:hums, borderColor:'#00d4ff', backgroundColor:'rgba(0,212,255,0.1)', borderWidth:1.5, tension:0.4, pointRadius:0}], {unit:'%'});
       buildLineChart('ch-pres-today', times, [{label:'Pressure', data:pres, borderColor:'#7fff6e', backgroundColor:'rgba(127,255,110,0.05)', borderWidth:1.5, tension:0.4, pointRadius:0}], {unit:' hPa'});
+      buildBatteryChart('ch-bat-today', times, readings.map(r=>r.battery_percent), readings.map(r=>r.battery_voltage));
     }
   } catch (e) {
     document.getElementById('today-content').innerHTML = `<div class="no-data">Error loading data: ${e.message}</div>`;
@@ -1102,9 +1291,9 @@ async function loadYesterday() {
           <div class="card">
             <div class="card-title" style="margin-bottom:12px;">Pressure</div>
             <div class="hla-row">
-              <div class="hla-card"><div class="hla-label">High</div><div class="hla-value hla-high">${fmt(s.pres_high, 0)}</div></div>
-              <div class="hla-card"><div class="hla-label">Low</div><div class="hla-value hla-low">${fmt(s.pres_low, 0)}</div></div>
-              <div class="hla-card"><div class="hla-label">Avg</div><div class="hla-value hla-avg">${fmt(s.pres_avg, 0)}</div></div>
+              <div class="hla-card"><div class="hla-label">High</div><div class="hla-value hla-high">${fmt(s.pres_high, 0)}<span style="font-size:11px;color:var(--text-dim);"> hPa</span></div></div>
+              <div class="hla-card"><div class="hla-label">Low</div><div class="hla-value hla-low">${fmt(s.pres_low, 0)}<span style="font-size:11px;color:var(--text-dim);"> hPa</span></div></div>
+              <div class="hla-card"><div class="hla-label">Avg</div><div class="hla-value hla-avg">${fmt(s.pres_avg, 0)}<span style="font-size:11px;color:var(--text-dim);"> hPa</span></div></div>
             </div>
           </div>
         </div>
@@ -1113,18 +1302,10 @@ async function loadYesterday() {
       </div>
       ${readings.length ? `
       <div class="grid-2 section">
-        <div class="card">
-          <div class="card-header"><span class="card-title">Temperature</span></div>
-          <div class="chart-container"><canvas id="ch-temp-yd"></canvas></div>
-        </div>
-        <div class="card">
-          <div class="card-header"><span class="card-title">Humidity</span></div>
-          <div class="chart-container"><canvas id="ch-hum-yd"></canvas></div>
-        </div>
-      </div>
-      <div class="card section">
-        <div class="card-header"><span class="card-title">Pressure</span></div>
-        <div class="chart-container"><canvas id="ch-pres-yd"></canvas></div>
+        ${chartCard('ch-temp-yd','Temperature','°C')}
+        ${chartCard('ch-hum-yd','Humidity','%')}
+        ${chartCard('ch-pres-yd','Pressure','hPa')}
+        ${chartCard('ch-bat-yd','Battery','%')}
       </div>
       ` : ''}
     `;
@@ -1134,6 +1315,7 @@ async function loadYesterday() {
       buildLineChart('ch-temp-yd', times, [{label:'Temp', data:readings.map(r=>r.temperature), borderColor:'#ff6b35', backgroundColor:'rgba(255,107,53,0.1)', borderWidth:1.5, tension:0.4, pointRadius:0}], {unit:'°C'});
       buildLineChart('ch-hum-yd', times, [{label:'Hum', data:readings.map(r=>r.humidity), borderColor:'#00d4ff', backgroundColor:'rgba(0,212,255,0.1)', borderWidth:1.5, tension:0.4, pointRadius:0}], {unit:'%'});
       buildLineChart('ch-pres-yd', times, [{label:'Pressure', data:readings.map(r=>r.pressure), borderColor:'#7fff6e', backgroundColor:'rgba(127,255,110,0.05)', borderWidth:1.5, tension:0.4, pointRadius:0}], {unit:' hPa'});
+      buildBatteryChart('ch-bat-yd', times, readings.map(r=>r.battery_percent), readings.map(r=>r.battery_voltage));
     }
   } catch (e) {
     document.getElementById('yesterday-content').innerHTML = `<div class="no-data">Error: ${e.message}</div>`;
@@ -1198,19 +1380,11 @@ async function loadThreeDays() {
 
     if (decimated.length) {
       html += `
-        <div class="card section">
-          <div class="card-header"><span class="card-title">Temperature — 3 Days</span></div>
-          <div class="chart-container tall"><canvas id="ch-temp-3d"></canvas></div>
-        </div>
         <div class="grid-2 section">
-          <div class="card">
-            <div class="card-header"><span class="card-title">Humidity</span></div>
-            <div class="chart-container"><canvas id="ch-hum-3d"></canvas></div>
-          </div>
-          <div class="card">
-            <div class="card-header"><span class="card-title">Pressure</span></div>
-            <div class="chart-container"><canvas id="ch-pres-3d"></canvas></div>
-          </div>
+          ${chartCard('ch-temp-3d','Temperature — 3 Days','°C')}
+          ${chartCard('ch-hum-3d','Humidity — 3 Days','%')}
+          ${chartCard('ch-pres-3d','Pressure — 3 Days','hPa')}
+          ${chartCard('ch-bat-3d','Battery — 3 Days','%')}
         </div>
       `;
     }
@@ -1225,6 +1399,7 @@ async function loadThreeDays() {
       buildLineChart('ch-temp-3d', labels, [{label:'Temp', data:decimated.map(r=>r.temperature), borderColor:'#ff6b35', backgroundColor:'rgba(255,107,53,0.08)', borderWidth:1.5, tension:0.3, pointRadius:0}], {unit:'°C'});
       buildLineChart('ch-hum-3d', labels, [{label:'Humidity', data:decimated.map(r=>r.humidity), borderColor:'#00d4ff', backgroundColor:'rgba(0,212,255,0.08)', borderWidth:1.5, tension:0.3, pointRadius:0}], {unit:'%'});
       buildLineChart('ch-pres-3d', labels, [{label:'Pressure', data:decimated.map(r=>r.pressure), borderColor:'#7fff6e', backgroundColor:'rgba(127,255,110,0.05)', borderWidth:1.5, tension:0.3, pointRadius:0}], {unit:' hPa'});
+      buildBatteryChart('ch-bat-3d', labels, decimated.map(r=>r.battery_percent), decimated.map(r=>r.battery_voltage));
     }
   } catch (e) {
     document.getElementById('three-content').innerHTML = `<div class="no-data">Error: ${e.message}</div>`;
@@ -1277,18 +1452,10 @@ async function loadWeek() {
 
       ${validDays.length ? `
       <div class="grid-2 section">
-        <div class="card">
-          <div class="card-header"><span class="card-title">Daily Temp Hi/Lo/Avg</span></div>
-          <div class="chart-container"><canvas id="ch-temp-wk"></canvas></div>
-        </div>
-        <div class="card">
-          <div class="card-header"><span class="card-title">Daily Humidity Hi/Lo/Avg</span></div>
-          <div class="chart-container"><canvas id="ch-hum-wk"></canvas></div>
-        </div>
-      </div>
-      <div class="card section">
-        <div class="card-header"><span class="card-title">Pressure — 7 Days</span></div>
-        <div class="chart-container tall"><canvas id="ch-pres-wk"></canvas></div>
+        ${chartCard('ch-temp-wk','Temperature Hi/Lo/Avg — 7 Days','°C')}
+        ${chartCard('ch-hum-wk','Humidity Hi/Lo/Avg — 7 Days','%')}
+        ${chartCard('ch-pres-wk','Pressure — 7 Days','hPa')}
+        ${chartCard('ch-bat-wk','Battery — 7 Days','%')}
       </div>
       ` : '<div class="no-data">No data available for the past 7 days</div>'}
     `;
@@ -1303,14 +1470,14 @@ async function loadWeek() {
 
       buildLineChart('ch-temp-wk', dayLabels, [
         {label:'High', data:hiTemps, borderColor:'#ff6b35', backgroundColor:'rgba(255,107,53,0.1)', borderWidth:2, tension:0.4, pointRadius:4, pointBackgroundColor:'#ff6b35'},
-        {label:'Avg', data:avgTemps, borderColor:'#7fff6e', backgroundColor:'rgba(127,255,110,0.05)', borderWidth:1.5, tension:0.4, pointRadius:3, borderDash:[4,2]},
-        {label:'Low', data:loTemps, borderColor:'#00d4ff', backgroundColor:'rgba(0,212,255,0.05)', borderWidth:2, tension:0.4, pointRadius:4, pointBackgroundColor:'#00d4ff'},
+        {label:'Avg',  data:avgTemps, borderColor:'#7fff6e', backgroundColor:'rgba(127,255,110,0.05)', borderWidth:1.5, tension:0.4, pointRadius:3, borderDash:[4,2]},
+        {label:'Low',  data:loTemps, borderColor:'#00d4ff', backgroundColor:'rgba(0,212,255,0.05)', borderWidth:2, tension:0.4, pointRadius:4, pointBackgroundColor:'#00d4ff'},
       ], {unit:'°C'});
 
       buildLineChart('ch-hum-wk', dayLabels, [
         {label:'High', data:hiHum, borderColor:'#ff6b35', backgroundColor:'rgba(255,107,53,0.05)', borderWidth:2, tension:0.4, pointRadius:4},
-        {label:'Avg', data:avgHum, borderColor:'#7fff6e', backgroundColor:'rgba(127,255,110,0.05)', borderWidth:1.5, tension:0.4, pointRadius:3, borderDash:[4,2]},
-        {label:'Low', data:loHum, borderColor:'#00d4ff', backgroundColor:'rgba(0,212,255,0.05)', borderWidth:2, tension:0.4, pointRadius:4},
+        {label:'Avg',  data:avgHum, borderColor:'#7fff6e', backgroundColor:'rgba(127,255,110,0.05)', borderWidth:1.5, tension:0.4, pointRadius:3, borderDash:[4,2]},
+        {label:'Low',  data:loHum, borderColor:'#00d4ff', backgroundColor:'rgba(0,212,255,0.05)', borderWidth:2, tension:0.4, pointRadius:4},
       ], {unit:'%'});
 
       if (decimated.length) {
@@ -1321,6 +1488,7 @@ async function loadWeek() {
         buildLineChart('ch-pres-wk', presLabels, [
           {label:'Pressure', data:decimated.map(r=>r.pressure), borderColor:'#7fff6e', backgroundColor:'rgba(127,255,110,0.05)', borderWidth:1.5, tension:0.3, pointRadius:0}
         ], {unit:' hPa'});
+        buildBatteryChart('ch-bat-wk', presLabels, decimated.map(r=>r.battery_percent), decimated.map(r=>r.battery_voltage));
       }
     }
   } catch(e) {

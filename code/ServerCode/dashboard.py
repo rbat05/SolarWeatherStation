@@ -48,12 +48,30 @@ def init_db():
                 value TEXT
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS relay_status (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                last_contact TEXT,
+                last_payload TEXT,
+                last_response_code INTEGER,
+                packets_received INTEGER DEFAULT 0,
+                errors INTEGER DEFAULT 0,
+                tracking_start TEXT
+            )
+        """)
+        try:
+            conn.execute("ALTER TABLE relay_status ADD COLUMN tracking_start TEXT")
+        except sqlite3.OperationalError:
+            pass
+
         result = conn.execute("SELECT value FROM settings WHERE key='simulated_today'").fetchone()
         if not result:
             conn.execute(
                 "INSERT INTO settings (key, value) VALUES ('simulated_today', ?)",
                 (date.today().isoformat(),)
             )
+        conn.execute("INSERT OR IGNORE INTO relay_status (id, packets_received, errors, tracking_start) VALUES (1, 0, 0, ?)", (datetime.now().isoformat(),))
+        conn.execute("UPDATE relay_status SET tracking_start = ? WHERE id = 1 AND tracking_start IS NULL", (datetime.now().isoformat(),))
         conn.commit()
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -91,6 +109,11 @@ def set_simulated_today(day_str: str):
     with get_db() as conn:
         conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('simulated_today', ?)", (day_str,))
         conn.commit()
+
+def get_relay_status() -> dict | None:
+    with get_db() as conn:
+        row = conn.execute("SELECT * FROM relay_status WHERE id = 1").fetchone()
+        return dict(row) if row else None
 
 def stats_for_day(day_date: str) -> dict:
     with get_db() as conn:
@@ -143,19 +166,59 @@ def fetch_metservice_current(location: str = "auckland") -> dict | None:
 @app.route("/ingest", methods=["POST"])
 def ingest():
     data = request.get_data(as_text=True).strip()
+    contact_ts = datetime.now().isoformat()
+    payload_trunc = data[:200]
+
     reading = parse_reading_line(data, source="live")
     if not reading:
         try:
             reading = request.get_json()
-            reading["source"] = "live"
-        except Exception: return jsonify({"error": "Invalid data"}), 400
+            if reading:
+                reading["source"] = "live"
+                payload_trunc = "JSON Payload"
+        except Exception: 
+            pass
+
+    is_error = 1 if not reading else 0
+    response_code = 400 if is_error else 201
 
     with get_db() as conn:
         conn.execute("""
-            INSERT INTO readings (timestamp, day_date, temperature, humidity, pressure, battery_voltage, battery_percent, source)
-            VALUES (:timestamp, :day_date, :temperature, :humidity, :pressure, :battery_voltage, :battery_percent, :source)
-        """, reading)
+            UPDATE relay_status 
+            SET last_contact = ?, last_payload = ?, last_response_code = ?, 
+                packets_received = packets_received + 1, errors = errors + ?
+            WHERE id = 1
+        """, (contact_ts, payload_trunc, response_code, is_error))
+
+        if reading:
+            conn.execute("""
+                INSERT INTO readings (timestamp, day_date, temperature, humidity, pressure, battery_voltage, battery_percent, source)
+                VALUES (:timestamp, :day_date, :temperature, :humidity, :pressure, :battery_voltage, :battery_percent, :source)
+            """, reading)
+            
+            # Auto-purge data older than 7 days
+            sim_today = get_simulated_today()
+            cutoff_date = (datetime.strptime(sim_today, "%Y-%m-%d") - timedelta(days=7)).strftime("%Y-%m-%d")
+            conn.execute("DELETE FROM readings WHERE day_date < ?", (cutoff_date,))
+            
+            # Long-term CSV Logging
+            try:
+                data_dir = os.path.join(os.path.dirname(__file__), "archive")
+                os.makedirs(data_dir, exist_ok=True)
+                csv_path = os.path.join(data_dir, f"{reading['day_date']}.csv")
+                
+                dt_obj = datetime.fromisoformat(reading["timestamp"])
+                ts_str = dt_obj.strftime("%a %d/%m/%Y - %H:%M:%S")
+                csv_line = f"{ts_str},{reading['temperature']:.2f},{reading['humidity']:.2f},{reading['pressure']:.2f},{reading['battery_voltage']:.2f},{reading['battery_percent']:.2f}\n"
+                
+                with open(csv_path, "a", encoding="utf-8") as f:
+                    f.write(csv_line)
+            except Exception:
+                pass
         conn.commit()
+        
+    if is_error:
+        return jsonify({"error": "Invalid data format"}), 400
     return jsonify({"status": "ok", "timestamp": reading["timestamp"]}), 201
 
 @app.route("/api/set-today", methods=["POST"])
@@ -163,6 +226,57 @@ def api_set_today():
     day_str = request.get_json().get("date", "")
     set_simulated_today(day_str)
     return jsonify({"status": "ok", "simulated_today": day_str})
+
+@app.route("/api/settings")
+def api_settings():
+    today = get_simulated_today()
+    data_dir = os.path.join(os.path.dirname(__file__), "archive")
+    csv_files = []
+    if os.path.exists(data_dir):
+        csv_files = sorted([f for f in os.listdir(data_dir) if f.endswith(".csv")], reverse=True)
+    return jsonify({
+        "simulated_today": today,
+        "csv_files": csv_files
+    })
+
+@app.route("/api/load-csv", methods=["POST"])
+def load_csv():
+    body = request.get_json()
+    filename = body.get("filename", "")
+    clear_existing = body.get("clear_existing", True)
+
+    m = re.match(r'(\d{4}-\d{2}-\d{2})\.csv', os.path.basename(filename))
+    if not m:
+        return jsonify({"error": "Filename must be YYYY-MM-DD.csv"}), 400
+
+    day_date = m.group(1)
+    data_dir = os.path.join(os.path.dirname(__file__), "archive")
+    filepath = os.path.join(data_dir, os.path.basename(filename))
+
+    if not os.path.exists(filepath):
+        return jsonify({"error": f"File not found: {filepath}"}), 404
+
+    inserted, errors = 0, 0
+    with get_db() as conn:
+        if clear_existing:
+            conn.execute("DELETE FROM readings WHERE day_date = ? AND source = 'csv'", (day_date,))
+        with open(filepath, "r") as f:
+            for line in f:
+                reading = parse_reading_line(line, source="csv")
+                if reading:
+                    conn.execute("INSERT INTO readings (timestamp, day_date, temperature, humidity, pressure, battery_voltage, battery_percent, source) VALUES (:timestamp, :day_date, :temperature, :humidity, :pressure, :battery_voltage, :battery_percent, :source)", reading)
+                    inserted += 1
+                elif line.strip() and not line.startswith("#"):
+                    errors += 1
+        conn.commit()
+    return jsonify({"status": "ok", "day_date": day_date, "inserted": inserted, "errors": errors})
+
+@app.route("/api/reset-relay-metrics", methods=["POST"])
+def reset_relay_metrics():
+    with get_db() as conn:
+        conn.execute("UPDATE relay_status SET packets_received = 0, errors = 0, tracking_start = ? WHERE id = 1", (datetime.now().isoformat(),))
+        conn.commit()
+    return jsonify({"status": "ok"})
 
 @app.route("/api/dashboard")
 def api_dashboard():
@@ -192,8 +306,9 @@ def api_dashboard():
             "today": readings_for_day(today),
             "three_days": readings_for_range(last3[0], last3[-1]),
             "week": readings_for_range(last7[0], last7[-1])
-        }
-    })
+        },
+        "relay_status": get_relay_status()})
+
 
 @app.route("/")
 def index():
@@ -350,13 +465,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .settings-bar input[type="date"] { background: transparent; border: 2px solid var(--lcd-text); color: var(--lcd-text); font-family: var(--font-lcd); font-size: 1.2rem; padding: 4px 8px; outline: none; }
   .settings-bar button { background: var(--lcd-text); color: var(--lcd-bg); border: 2px solid var(--lcd-text); font-family: var(--font-lcd); font-size: 1.2rem; padding: 4px 16px; cursor: pointer; }
   .settings-bar button:active { background: transparent; color: var(--lcd-text); }
+  .settings-bar select { background: transparent; border: 2px solid var(--lcd-text); color: var(--lcd-text); font-family: var(--font-lcd); font-size: 1.2rem; padding: 4px 8px; outline: none; cursor: pointer; }
 
 </style>
 </head>
 <body>
 
 <div class="device-bezel">
-  <div class="device-logo">WEATHER STATION</div>
+  <div class="device-logo">DASHBOARD</div>
   <div class="lcd-screen">
     
     <!-- Header -->
@@ -447,33 +563,59 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     <!-- Interactive Chart Area -->
     <div class="chart-section">
       <div class="chart-header">
-        <div style="font-size: 1.5rem; font-weight: bold; border-bottom: 2px solid var(--lcd-text);">LOG</div>
-        <div class="controls">
-          <div class="pill-group" id="metric-toggles">
-            <button class="pill active" data-metric="temperature">TEMP</button>
-            <button class="pill" data-metric="humidity">HUM</button>
-            <button class="pill" data-metric="pressure">PRES</button>
-            <button class="pill" data-metric="battery_percent">BATT</button>
-          </div>
-          <div class="pill-group" id="time-toggles">
-            <button class="pill active" data-time="today">24H</button>
-            <button class="pill" data-time="three_days">72H</button>
-            <button class="pill" data-time="week">7D</button>
-          </div>
-        </div>
+        <div style="font-size: 1.5rem; font-weight: bold; border-bottom: 2px solid var(--lcd-text);">LOGGED DATA</div>
       </div>
+      <div class="tagline" id="chart-tagline" style="font-size: 1.2rem; color: var(--lcd-text-dim); margin-bottom: 12px;">SELECT METRIC AND TIMEFRAME TO VIEW DATA</div>
       <div class="chart-container">
 
         <canvas id="mainChart"></canvas>
+      </div>
+      <div class="controls" style="justify-content: space-between; margin-top: 12px;">
+        <div class="pill-group" id="metric-toggles">
+          <button class="pill active" data-metric="temperature">TEMP</button>
+          <button class="pill" data-metric="humidity">HUM</button>
+          <button class="pill" data-metric="pressure">PRES</button>
+          <button class="pill" data-metric="battery_percent">BATT</button>
+        </div>
+        <div class="pill-group" id="time-toggles">
+          <button class="pill" data-time="1h">1H</button>
+          <button class="pill" data-time="3h">3H</button>
+          <button class="pill" data-time="12h">12H</button>
+          <button class="pill active" data-time="today">24H</button>
+          <button class="pill" data-time="three_days">72H</button>
+          <button class="pill" data-time="week">7D</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Relay Status Section -->
+    <div style="margin-top: 10px;">
+      <button class="pill" style="width: 100%; border: 3px solid var(--lcd-text); font-weight: bold; cursor: pointer; text-align: center; padding: 12px; transition: all 0.2s;" onclick="const p = document.getElementById('diagnostics-panel'); p.style.display = p.style.display === 'none' ? 'block' : 'none'; this.classList.toggle('active');">
+        [ SYS DIAGNOSTICS & RELAY STATUS ]
+      </button>
+    </div>
+    
+    <div id="diagnostics-panel" style="display: none; border: 3px solid var(--lcd-text); padding: 16px; margin-top: 10px; background: rgba(0,0,0,0.05);">
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; font-size: 1.2rem;">
+        <div>LAST CONTACT: <br><span id="diag-contact" style="color: var(--lcd-text-dim);">--</span></div>
+        <div>RELAY HEALTH: <br><span id="diag-health" style="color: var(--lcd-text-dim);">--</span></div>
+        <div>PACKETS RX: <br><span id="diag-rx" style="color: var(--lcd-text-dim);">--</span></div>
+        <div>PACKET LOSS: <br><span id="diag-loss" style="color: var(--lcd-text-dim);">--</span></div>
+        <div style="grid-column: 1 / -1;">LAST PAYLOAD: <br><span id="diag-payload" style="color: var(--lcd-text-dim); word-break: break-all;">--</span></div>
       </div>
     </div>
 
     <!-- Footer / Tools -->
     <div class="settings-bar">
-      <div style="display: flex; gap: 8px; align-items: center;">
+      <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
         <span>SIM DATE:</span>
         <input type="date" id="sim-date">
         <button onclick="updateSimDate()">SET</button>
+        <span style="margin-left: 20px;">CSV DATA:</span>
+        <select id="csv-file-select"></select>
+        <button onclick="loadSelectedCSV()">LOAD</button>
+        <button style="margin-left: 20px;" onclick="resetRelayMetrics()">RESET RX STATS</button>
+        <span id="csv-status" style="margin-left: 8px; color: var(--lcd-text-dim);"></span>
       </div>
       <div id="last-update">LAST SYNC: --</div>
     </div>
@@ -507,7 +649,8 @@ async function fetchDashboard(isInit = false) {
     const res = await fetch(url);
     const newData = await res.json();
     
-    const newHash = (newData.latest ? newData.latest.timestamp : 'no-live') + newData.simulated_today;
+    const newHash = (newData.latest ? newData.latest.timestamp : 'no-live') + newData.simulated_today + 
+                    (newData.relay_status ? newData.relay_status.packets_received + '-' + newData.relay_status.errors : '');
     
     if (newHash !== lastDashboardHash) {
       dashboardData = newData;
@@ -526,10 +669,6 @@ function updateUI() {
   const live = dashboardData.latest;
   const stats = dashboardData.stats_today;
   
-  document.getElementById('live-text').textContent = live ? "RX: OK" : "RX: WAIT";
-  const dot = document.querySelector('.status-dot');
-  if (live) dot.classList.add('active'); else dot.classList.remove('active');
-  
   if (live) {
     document.getElementById('curr-temp').textContent = live.temperature.toFixed(1);
     document.getElementById('curr-hum').textContent = `${live.humidity.toFixed(1)}%`;
@@ -546,6 +685,22 @@ function updateUI() {
   if (stats && stats.temp_high !== null) {
     document.getElementById('hi-temp').textContent = stats.temp_high.toFixed(1);
     document.getElementById('lo-temp').textContent = stats.temp_low.toFixed(1);
+  }
+
+  if (dashboardData.relay_status) {
+    const rs = dashboardData.relay_status;
+    document.getElementById('diag-contact').textContent = rs.last_contact ? new Date(rs.last_contact).toLocaleTimeString('en-US', {hour12: false}) : 'NEVER';
+    
+    let healthText = '--';
+    if (rs.last_response_code === 200 || rs.last_response_code === 201) {
+      healthText = 'HEALTHY';
+    } else if (rs.last_response_code) {
+      healthText = 'FAULT (CODE ' + rs.last_response_code + ')';
+    }
+    document.getElementById('diag-health').textContent = healthText;
+
+    document.getElementById('diag-rx').textContent = rs.packets_received || '0';
+    document.getElementById('diag-payload').textContent = rs.last_payload || 'NONE';
   }
 
   document.getElementById('sim-date').value = dashboardData.simulated_today;
@@ -585,7 +740,17 @@ function renderChart() {
   const ctx = document.getElementById('mainChart');
   if (!ctx) return;
 
-  let rawData = dashboardData.charts[currentTimeframe] || [];
+  let rawData = [];
+  if (['1h', '3h', '12h'].includes(currentTimeframe)) {
+    if (dashboardData.latest && dashboardData.charts.three_days) {
+      const latestMs = new Date(dashboardData.latest.timestamp).getTime();
+      const hours = currentTimeframe === '1h' ? 1 : (currentTimeframe === '3h' ? 3 : 12);
+      const cutoff = latestMs - (hours * 60 * 60 * 1000);
+      rawData = dashboardData.charts.three_days.filter(r => new Date(r.timestamp).getTime() >= cutoff);
+    }
+  } else {
+    rawData = dashboardData.charts[currentTimeframe] || [];
+  }
   
   let targetPoints = 150;
   let step = Math.ceil(rawData.length / targetPoints);
@@ -593,8 +758,11 @@ function renderChart() {
 
   const labels = plotData.map(r => {
     let d = new Date(r.timestamp);
-    if(currentTimeframe === 'today') return d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-    return d.toLocaleDateString([], {month:'short', day:'numeric'}) + ' ' + d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    if(['today', '1h', '3h', '12h'].includes(currentTimeframe)) return d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    return [
+      d.toLocaleDateString([], {month:'short', day:'numeric'}), 
+      d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+    ];
   });
   
   const dataPoints = plotData.map(r => r[currentMetric]);
@@ -862,17 +1030,81 @@ async function updateSimDate() {
   fetchDashboard(true);
 }
 
+async function loadSettings() {
+  try {
+    const res = await fetch('/api/settings');
+    const data = await res.json();
+    const select = document.getElementById('csv-file-select');
+    if (data.csv_files && data.csv_files.length) {
+      select.innerHTML = data.csv_files.map(f => `<option value="${f}">${f}</option>`).join('');
+    } else {
+      select.innerHTML = '<option value="">NO CSV FILES</option>';
+    }
+  } catch (e) {}
+}
+
+async function loadSelectedCSV() {
+  const filename = document.getElementById('csv-file-select').value;
+  const statusEl = document.getElementById('csv-status');
+  if (!filename || filename === 'NO CSV FILES') return;
+  statusEl.textContent = "LOADING...";
+  try {
+    const res = await fetch('/api/load-csv', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({filename, clear_existing: true}) });
+    const data = await res.json();
+    if (data.error) statusEl.textContent = `ERR: ${data.error}`;
+    else { statusEl.textContent = `OK: ${data.inserted} ROWS`; lastDashboardHash = ''; fetchDashboard(true); }
+  } catch (e) { statusEl.textContent = "ERR: NETWORK"; }
+  setTimeout(() => statusEl.textContent = "", 5000);
+}
+
+async function resetRelayMetrics() {
+  await fetch('/api/reset-relay-metrics', { method: 'POST' });
+  lastDashboardHash = '';
+  fetchDashboard(true);
+}
+
 // Live Clock Update
 function updateLiveClock() {
   const now = new Date();
   document.getElementById('live-clock').textContent = now.toLocaleTimeString('en-US', {hour12: false});
+  
+  const dot = document.querySelector('.status-dot');
+  const liveText = document.getElementById('live-text');
+  
+  if (dashboardData.relay_status && dashboardData.relay_status.last_contact) {
+    const lastContactMs = new Date(dashboardData.relay_status.last_contact).getTime();
+    const diffSeconds = (now.getTime() - lastContactMs) / 1000;
+    
+    if (diffSeconds > 60) {
+      liveText.textContent = "RX: WAIT";
+      if (dot) dot.classList.remove('active');
+    } else {
+      liveText.textContent = "RX: OK";
+      if (dot) dot.classList.add('active');
+    }
+  } else {
+    liveText.textContent = "RX: WAIT";
+    if (dot) dot.classList.remove('active');
+  }
+
+  if (dashboardData.relay_status && dashboardData.relay_status.tracking_start) {
+    const startMs = new Date(dashboardData.relay_status.tracking_start).getTime();
+    const elapsedSec = (now.getTime() - startMs) / 1000;
+    const expected = Math.max(1, Math.floor(elapsedSec / 30));
+    const received = dashboardData.relay_status.packets_received || 0;
+    let loss = ((expected - received) / expected) * 100;
+    if (loss < 0) loss = 0;
+    if (loss > 100) loss = 100;
+    document.getElementById('diag-loss').textContent = loss.toFixed(1) + '%';
+  }
 }
 setInterval(updateLiveClock, 1000);
 updateLiveClock();
 
 // Boot up
+loadSettings();
 fetchDashboard(true);
-setInterval(() => fetchDashboard(false), 30000); 
+setInterval(() => fetchDashboard(false), 5000); 
 
 </script>
 </body>
@@ -883,7 +1115,7 @@ setInterval(() => fetchDashboard(false), 30000);
 
 if __name__ == "__main__":
     init_db()
-    os.makedirs(os.path.join(os.path.dirname(__file__), "data"), exist_ok=True)
+    os.makedirs(os.path.join(os.path.dirname(__file__), "archive"), exist_ok=True)
     print("=" * 60)
     print("  Weather Station Dashboard (V3 - LCD Theme)")
     print("  http://localhost:5000")
