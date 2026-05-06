@@ -13,20 +13,22 @@ from datetime import datetime, timedelta, date
 from flask import Flask, request, jsonify, render_template_string
 
 app = Flask(__name__)
-DB_PATH = os.path.join(os.path.dirname(__file__), "weather.db")
+LIVE_DB_PATH = os.path.join(os.path.dirname(__file__), "weather.db")
+REPLAY_DB_PATH = os.path.join(os.path.dirname(__file__), "replay.db")
 
 _cached_metservice = None
 _last_reading_ts = None
 
 # ─── Database Setup ──────────────────────────────────────────────────────────
 
-def get_db():
-    conn = sqlite3.connect(DB_PATH)
+def get_db(mode="live"):
+    db_path = LIVE_DB_PATH if mode == "live" else REPLAY_DB_PATH
+    conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     return conn
 
-def init_db():
-    with get_db() as conn:
+def init_db(db_path):
+    with sqlite3.connect(db_path) as conn:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS readings (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -100,23 +102,23 @@ def parse_reading_line(line: str, source: str = "live") -> dict | None:
     except Exception:
         return None
 
-def get_simulated_today() -> str:
-    with get_db() as conn:
+def get_simulated_today(mode="live") -> str:
+    with get_db(mode) as conn:
         row = conn.execute("SELECT value FROM settings WHERE key='simulated_today'").fetchone()
         return row["value"] if row else date.today().isoformat()
 
-def set_simulated_today(day_str: str):
-    with get_db() as conn:
+def set_simulated_today(day_str: str, mode="live"):
+    with get_db(mode) as conn:
         conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('simulated_today', ?)", (day_str,))
         conn.commit()
 
-def get_relay_status() -> dict | None:
-    with get_db() as conn:
+def get_relay_status(mode="live") -> dict | None:
+    with get_db(mode) as conn:
         row = conn.execute("SELECT * FROM relay_status WHERE id = 1").fetchone()
         return dict(row) if row else None
 
-def stats_for_day(day_date: str) -> dict:
-    with get_db() as conn:
+def stats_for_day(day_date: str, mode="live") -> dict:
+    with get_db(mode) as conn:
         row = conn.execute("""
             SELECT MIN(temperature) as temp_low, MAX(temperature) as temp_high, AVG(temperature) as temp_avg,
                    MIN(humidity) as hum_low, MAX(humidity) as hum_high, AVG(humidity) as hum_avg,
@@ -126,18 +128,13 @@ def stats_for_day(day_date: str) -> dict:
         """, (day_date,)).fetchone()
         return dict(row) if row and row["count"] > 0 else {}
 
-def readings_for_day(day_date: str) -> list:
-    with get_db() as conn:
-        rows = conn.execute("SELECT * FROM readings WHERE day_date = ? ORDER BY timestamp ASC", (day_date,)).fetchall()
-        return [dict(r) for r in rows]
-
-def readings_for_range(start_date: str, end_date: str) -> list:
-    with get_db() as conn:
+def readings_for_range(start_date: str, end_date: str, mode="live") -> list:
+    with get_db(mode) as conn:
         rows = conn.execute("SELECT * FROM readings WHERE day_date >= ? AND day_date <= ? ORDER BY timestamp ASC", (start_date, end_date)).fetchall()
         return [dict(r) for r in rows]
 
-def latest_reading() -> dict | None:
-    with get_db() as conn:
+def latest_reading(mode="live") -> dict | None:
+    with get_db(mode) as conn:
         row = conn.execute("SELECT * FROM readings ORDER BY timestamp DESC LIMIT 1").fetchone()
         return dict(row) if row else None
 
@@ -182,7 +179,7 @@ def ingest():
     is_error = 1 if not reading else 0
     response_code = 400 if is_error else 201
 
-    with get_db() as conn:
+    with get_db("live") as conn:
         conn.execute("""
             UPDATE relay_status 
             SET last_contact = ?, last_payload = ?, last_response_code = ?, 
@@ -197,7 +194,7 @@ def ingest():
             """, reading)
             
             # Auto-purge data older than 7 days
-            sim_today = get_simulated_today()
+            sim_today = get_simulated_today("live")
             cutoff_date = (datetime.strptime(sim_today, "%Y-%m-%d") - timedelta(days=7)).strftime("%Y-%m-%d")
             conn.execute("DELETE FROM readings WHERE day_date < ?", (cutoff_date,))
             
@@ -213,8 +210,8 @@ def ingest():
                 
                 with open(csv_path, "a", encoding="utf-8") as f:
                     f.write(csv_line)
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[!] Failed to write to CSV archive: {e}")
         conn.commit()
         
     if is_error:
@@ -223,13 +220,16 @@ def ingest():
 
 @app.route("/api/set-today", methods=["POST"])
 def api_set_today():
-    day_str = request.get_json().get("date", "")
-    set_simulated_today(day_str)
+    body = request.get_json()
+    day_str = body.get("date", "")
+    mode = body.get("mode", "live")
+    set_simulated_today(day_str, mode)
     return jsonify({"status": "ok", "simulated_today": day_str})
 
 @app.route("/api/settings")
 def api_settings():
-    today = get_simulated_today()
+    mode = request.args.get("mode", "live")
+    today = get_simulated_today(mode)
     data_dir = os.path.join(os.path.dirname(__file__), "archive")
     csv_files = []
     if os.path.exists(data_dir):
@@ -242,6 +242,7 @@ def api_settings():
 @app.route("/api/load-csv", methods=["POST"])
 def load_csv():
     body = request.get_json()
+    mode = body.get("mode", "replay")
     filename = body.get("filename", "")
     clear_existing = body.get("clear_existing", True)
 
@@ -257,7 +258,7 @@ def load_csv():
         return jsonify({"error": f"File not found: {filepath}"}), 404
 
     inserted, errors = 0, 0
-    with get_db() as conn:
+    with get_db(mode) as conn:
         if clear_existing:
             conn.execute("DELETE FROM readings WHERE day_date = ? AND source = 'csv'", (day_date,))
         with open(filepath, "r") as f:
@@ -271,22 +272,31 @@ def load_csv():
         conn.commit()
     return jsonify({"status": "ok", "day_date": day_date, "inserted": inserted, "errors": errors})
 
+@app.route("/api/clear-replay", methods=["POST"])
+def clear_replay():
+    with get_db("replay") as conn:
+        conn.execute("DELETE FROM readings")
+        conn.commit()
+    return jsonify({"status": "ok"})
+
 @app.route("/api/reset-relay-metrics", methods=["POST"])
 def reset_relay_metrics():
-    with get_db() as conn:
+    mode = request.get_json().get("mode", "live") if request.is_json else "live"
+    with get_db(mode) as conn:
         conn.execute("UPDATE relay_status SET packets_received = 0, errors = 0, tracking_start = ? WHERE id = 1", (datetime.now().isoformat(),))
         conn.commit()
     return jsonify({"status": "ok"})
 
 @app.route("/api/dashboard")
 def api_dashboard():
+    mode = request.args.get("mode", "live")
     global _cached_metservice, _last_reading_ts
-    today = get_simulated_today()
+    today = get_simulated_today(mode)
     yesterday = (datetime.strptime(today, "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
     last3 = days_with_data(3, today)
     last7 = days_with_data(7, today)
     
-    latest = latest_reading()
+    latest = latest_reading(mode)
     latest_ts = latest["timestamp"] if latest else None
     is_init = request.args.get("init") == "true"
 
@@ -297,17 +307,15 @@ def api_dashboard():
     return jsonify({
         "simulated_today": today,
         "latest": latest,
-        "stats_today": stats_for_day(today),
-        "stats_yesterday": [{"date": yesterday, "stats": stats_for_day(yesterday)}],
-        "stats_3days": [{"date": d, "stats": stats_for_day(d)} for d in last3],
-        "stats_week": [{"date": d, "stats": stats_for_day(d)} for d in last7],
+        "stats_today": stats_for_day(today, mode),
+        "stats_yesterday": [{"date": yesterday, "stats": stats_for_day(yesterday, mode)}],
+        "stats_3days": [{"date": d, "stats": stats_for_day(d, mode)} for d in last3],
+        "stats_week": [{"date": d, "stats": stats_for_day(d, mode)} for d in last7],
         "metservice": _cached_metservice,
         "charts": {
-            "today": readings_for_day(today),
-            "three_days": readings_for_range(last3[0], last3[-1]),
-            "week": readings_for_range(last7[0], last7[-1])
+            "week": readings_for_range(last7[0], last7[-1], mode)
         },
-        "relay_status": get_relay_status()})
+        "relay_status": get_relay_status(mode)})
 
 
 @app.route("/")
@@ -320,8 +328,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WS-2000 Control Panel</title>
+<meta name="viewport" content="width=1000">
+<title>Weather Monitor Dashboard</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <style>
@@ -380,11 +388,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     box-shadow: inset 0 0 20px rgba(0,0,0,0.15);
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 20px;
   }
 
   /* ─── Header ─── */
-  header { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid var(--lcd-text); padding-bottom: 12px; flex-wrap: wrap; gap: 10px; }
+  header { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid var(--lcd-text); padding-bottom: 20px; flex-wrap: wrap; gap: 10px; }
   .brand { font-size: 2rem; font-weight: bold; letter-spacing: 2px; display: flex; align-items: center; }
   .status-badge { display: flex; align-items: center; gap: 12px; font-size: 1.5rem; }
   
@@ -393,11 +401,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .status-dot.active { animation: blink 1s infinite steps(2, start); }
 
   /* ─── Main Readouts ─── */
-  .hero { display: flex; gap: 16px; border-bottom: 3px solid var(--lcd-text); padding-bottom: 16px; }
-  @media (max-width: 600px) { .hero { flex-direction: column; } }
+  .hero { display: flex; gap: 16px; border-bottom: 3px solid var(--lcd-text); padding-bottom: 20px; }
   
-  .lcd-segment { color: var(--lcd-text); opacity: 0.12; line-height: 1.2; pointer-events: none; user-select: none; font-weight: bold; transition: opacity 0.3s; }
-  .lcd-segment.active { opacity: 1; }
+  @keyframes pulse-segment { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+  .lcd-segment { color: var(--lcd-text); opacity: 0.12; line-height: 1.2; cursor: help; user-select: none; font-weight: bold; transition: opacity 0.3s; }
+  .lcd-segment.active { opacity: 1; animation: pulse-segment 2s infinite ease-in-out; }
 
   .main-temp { flex: 2; border: 3px solid var(--lcd-text); padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
   .temp-label { font-size: 1.5rem; letter-spacing: 1px; width: 100%; text-align: left; border-bottom: 2px dashed var(--lcd-text-dim); margin-bottom: 10px; padding-bottom: 5px; display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; }
@@ -414,8 +422,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .bat-bar-fg { height: 100%; background: var(--lcd-text); }
 
   /* ─── Summary Section ─── */
-  .summary-section { padding-top: 16px; border-bottom: 3px solid var(--lcd-text); padding-bottom: 16px; }
-  .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-top: 10px; }
+  .summary-section { border-bottom: 3px solid var(--lcd-text); padding-bottom: 20px; }
+  .summary-grid { display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 10px; }
   .summary-card { border: 3px solid var(--lcd-text); padding: 12px; }
   .sc-label { font-size: 1.2rem; border-bottom: 2px solid var(--lcd-text); padding-bottom: 4px; margin-bottom: 8px; }
   .sc-values { display: flex; justify-content: space-between; text-align: center; }
@@ -425,7 +433,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .sc-val { font-size: 1.5rem; }
 
   /* ─── Chart Section ─── */
-  .chart-section { padding-top: 10px; }
+  .chart-section { border-bottom: 3px solid var(--lcd-text); padding-bottom: 20px; }
   .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;}
   
   .controls { display: flex; gap: 16px; flex-wrap: wrap;}
@@ -442,7 +450,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .pill:hover { border-color: var(--lcd-text); color: var(--lcd-text); }
   .pill.active { background: var(--lcd-text); color: var(--lcd-bg); border-color: var(--lcd-text); }
 
-  .chart-container { position: relative; height: 300px; width: 100%; border: 3px solid var(--lcd-text); padding: 10px; overflow: hidden; }
+  .chart-container { 
+    position: relative; height: 300px; width: 100%; border: 3px solid var(--lcd-text); padding: 10px; overflow: hidden; display: block; box-sizing: border-box;
+  }
 
   .radar-sweep {
     position: absolute;
@@ -460,32 +470,38 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     100% { left: 100%; opacity: 0; }
   }
 
-  /* ─── Footer ─── */
-  .settings-bar { border-top: 3px dashed var(--lcd-text-dim); padding-top: 16px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center; font-size: 1.2rem; flex-wrap: wrap; gap: 12px;}
-  .settings-bar input[type="date"] { background: transparent; border: 2px solid var(--lcd-text); color: var(--lcd-text); font-family: var(--font-lcd); font-size: 1.2rem; padding: 4px 8px; outline: none; }
-  .settings-bar button { background: var(--lcd-text); color: var(--lcd-bg); border: 2px solid var(--lcd-text); font-family: var(--font-lcd); font-size: 1.2rem; padding: 4px 16px; cursor: pointer; }
-  .settings-bar button:active { background: transparent; color: var(--lcd-text); }
-  .settings-bar select { background: transparent; border: 2px solid var(--lcd-text); color: var(--lcd-text); font-family: var(--font-lcd); font-size: 1.2rem; padding: 4px 8px; outline: none; cursor: pointer; }
+  /* ─── Replay Section ─── */
+  .replay-section { border-bottom: 3px solid var(--lcd-text); padding-bottom: 20px; }
+  .replay-section input[type="date"] { background: transparent; border: 2px solid var(--lcd-text); color: var(--lcd-text); font-family: var(--font-lcd); font-size: 1.2rem; padding: 4px 8px; outline: none; }
+  .replay-section button { background: var(--lcd-text); color: var(--lcd-bg); border: 2px solid var(--lcd-text); font-family: var(--font-lcd); font-size: 1.2rem; padding: 4px 16px; cursor: pointer; font-weight: bold; }
+  .replay-section button:active { background: transparent; color: var(--lcd-text); }
+  .replay-section select { background: transparent; border: 2px solid var(--lcd-text); color: var(--lcd-text); font-family: var(--font-lcd); font-size: 1.2rem; padding: 4px 8px; outline: none; cursor: pointer; }
 
 </style>
 </head>
 <body>
 
 <div class="device-bezel">
-  <div class="device-logo">DASHBOARD</div>
+  <div class="device-logo">WEATHER MONITOR DASHBOARD</div>
   <div class="lcd-screen">
     
     <!-- Header -->
     <header>
-      <div class="brand">WEATHER MONITOR <span id="live-clock" style="font-size: 1.2rem; margin-left: 20px; color: var(--lcd-text-dim);">--:--:--</span></div>
-      <div class="status-badge">
+      <div class="brand">
+        WEATHER MONITOR <span id="live-clock" style="font-size: 1.2rem; margin-left: 20px; color: var(--lcd-text-dim);">--:--:--</span>
+      </div>
+      <div class="mode-selector" style="display: flex; gap: 8px;">
+        <button id="btn-mode-live" class="pill active" onclick="setMode('live')">LIVE</button>
+        <button id="btn-mode-replay" class="pill" onclick="setMode('replay')">REPLAY</button>
+      </div>
+      <div class="status-badge" id="status-badge-container">
         <span id="live-text">RX: WAIT</span>
         <div class="status-dot"></div>
       </div>
     </header>
 
     <!-- Hero Stats -->
-    <div class="hero">
+    <div class="hero" id="hero-section">
       <div class="main-temp">
         <div class="temp-label">
           <span>TEMPERATURE</span>
@@ -531,10 +547,41 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         <div class="mini-card" style="padding-bottom: 8px;">
           <div style="display:flex; justify-content: space-between; align-items: center;">
             <div class="mc-label" style="border:none; margin:0; padding:0;">BATTERY</div>
-            <div id="seg-bat-low" class="lcd-segment" style="font-size: 1.2rem; text-align: right; margin-right: 10px; flex-grow: 1;">LOW!</div>
+            <div id="seg-bat-low" class="lcd-segment" style="font-size: 1.2rem; text-align: left; margin-right: 10px; flex-grow: 1; padding-left: 10px;">LOW!</div>
             <div class="mc-val" style="font-size: 1.5rem;" id="curr-bat">--%</div>
           </div>
           <div class="bat-bar-bg"><div class="bat-bar-fg" id="bat-fill" style="width: 0%;"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Replay Setup Section -->
+    <div class="replay-section" id="settings-section" style="display: none;">
+      <div class="chart-header">
+        <div>
+          <div style="font-size: 1.5rem; font-weight: bold; border-bottom: 2px solid var(--lcd-text);">REPLAY SETUP</div>
+          <div style="font-size: 1.2rem; color: var(--lcd-text-dim); margin-top: 8px;">CONFIGURE HISTORICAL DATA PLAYBACK</div>
+        </div>
+      </div>
+      <div style="display: flex; gap: 24px; flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 250px;">
+          <div style="font-size: 1rem; color: var(--lcd-text-dim); margin-bottom: 8px;">1. LOAD ARCHIVED CSV</div>
+          <div style="display: flex; gap: 8px;">
+            <select id="csv-file-select" style="flex: 1; width: 0; min-width: 0;"></select>
+            <button onclick="loadSelectedCSV()">LOAD</button>
+          </div>
+          <div id="csv-status" style="font-size: 1rem; color: var(--lcd-text-dim); margin-top: 4px; min-height: 1.2em;"></div>
+        </div>
+        <div style="flex: 1; min-width: 200px;">
+          <div style="font-size: 1rem; color: var(--lcd-text-dim); margin-bottom: 8px;">2. SET SIMULATED DATE</div>
+          <div style="display: flex; gap: 8px;">
+            <input type="date" id="sim-date" style="flex: 1; width: 0;">
+            <button onclick="updateSimDate()">SET</button>
+          </div>
+        </div>
+        <div style="flex: 1; min-width: 150px;">
+          <div style="font-size: 1rem; color: var(--lcd-text-dim); margin-bottom: 8px;">3. RESET DATA</div>
+          <button style="width: 100%;" onclick="clearReplayDB()">CLEAR DB</button>
         </div>
       </div>
     </div>
@@ -549,6 +596,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         <div class="controls">
           <div class="pill-group" id="summary-toggles">
             <button class="pill active" data-sum="now">NOW</button>
+            <button class="pill" data-sum="today" style="display: none;">TDAY</button>
             <button class="pill" data-sum="yesterday">YDAY</button>
             <button class="pill" data-sum="3days">72H</button>
             <button class="pill" data-sum="week">7D</button>
@@ -563,9 +611,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     <!-- Interactive Chart Area -->
     <div class="chart-section">
       <div class="chart-header">
-        <div style="font-size: 1.5rem; font-weight: bold; border-bottom: 2px solid var(--lcd-text);">LOGGED DATA</div>
+        <div>
+          <div style="font-size: 1.5rem; font-weight: bold; border-bottom: 2px solid var(--lcd-text);">LOGGED DATA</div>
+          <div id="chart-tagline" style="font-size: 1.2rem; color: var(--lcd-text-dim); margin-top: 8px;">SELECT METRIC AND TIMEFRAME TO VIEW DATA</div>
+        </div>
       </div>
-      <div class="tagline" id="chart-tagline" style="font-size: 1.2rem; color: var(--lcd-text-dim); margin-bottom: 12px;">SELECT METRIC AND TIMEFRAME TO VIEW DATA</div>
       <div class="chart-container">
 
         <canvas id="mainChart"></canvas>
@@ -578,46 +628,45 @@ HTML_TEMPLATE = """<!DOCTYPE html>
           <button class="pill" data-metric="battery_percent">BATT</button>
         </div>
         <div class="pill-group" id="time-toggles">
-          <button class="pill" data-time="1h">1H</button>
-          <button class="pill" data-time="3h">3H</button>
-          <button class="pill" data-time="12h">12H</button>
-          <button class="pill active" data-time="today">24H</button>
+          <button class="pill live-only-time" data-time="1h">1H</button>
+          <button class="pill active live-only-time" data-time="3h">3H</button>
+          <button class="pill live-only-time" data-time="12h">12H</button>
+          <button class="pill" data-time="today">24H</button>
           <button class="pill" data-time="three_days">72H</button>
           <button class="pill" data-time="week">7D</button>
+        </div>
+      </div>
+      <div id="custom-time-container" style="display: none; flex-direction: column; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 2px dashed var(--lcd-text-dim);">
+        <div style="font-size: 1.2rem; font-weight: bold; color: var(--lcd-text);">CUSTOM TIME RANGE FILTER</div>
+        <div style="font-size: 1rem; color: var(--lcd-text-dim);">ENTER START AND END TIMES TO ISOLATE A SPECIFIC PORTION OF THE SIMULATED DAY.</div>
+        <div style="display: flex; gap: 12px; align-items: center; margin-top: 8px; flex-wrap: wrap;">
+          <span style="color: var(--lcd-text-dim); font-size: 1.2rem;">START TIME:</span>
+          <input type="time" id="custom-start" value="06:00" style="background: transparent; border: 2px solid var(--lcd-text); color: var(--lcd-text); font-family: var(--font-lcd); font-size: 1.2rem; padding: 4px 8px; outline: none; cursor: pointer;">
+          <span style="color: var(--lcd-text-dim); font-size: 1.2rem; margin-left: 12px;">END TIME:</span>
+          <input type="time" id="custom-end" value="18:00" style="background: transparent; border: 2px solid var(--lcd-text); color: var(--lcd-text); font-family: var(--font-lcd); font-size: 1.2rem; padding: 4px 8px; outline: none; cursor: pointer;">
+          <button class="pill" style="font-weight: bold; margin-left: 12px;" onclick="applyCustomRange()">PLOT RANGE</button>
         </div>
       </div>
     </div>
 
     <!-- Relay Status Section -->
-    <div style="margin-top: 10px;">
+    <div id="diagnostics-btn-container">
       <button class="pill" style="width: 100%; border: 3px solid var(--lcd-text); font-weight: bold; cursor: pointer; text-align: center; padding: 12px; transition: all 0.2s;" onclick="const p = document.getElementById('diagnostics-panel'); p.style.display = p.style.display === 'none' ? 'block' : 'none'; this.classList.toggle('active');">
         [ SYS DIAGNOSTICS & RELAY STATUS ]
       </button>
     </div>
     
-    <div id="diagnostics-panel" style="display: none; border: 3px solid var(--lcd-text); padding: 16px; margin-top: 10px; background: rgba(0,0,0,0.05);">
+    <div id="diagnostics-panel" style="display: none; border: 3px solid var(--lcd-text); padding: 16px; background: rgba(0,0,0,0.05);">
       <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; font-size: 1.2rem;">
         <div>LAST CONTACT: <br><span id="diag-contact" style="color: var(--lcd-text-dim);">--</span></div>
         <div>RELAY HEALTH: <br><span id="diag-health" style="color: var(--lcd-text-dim);">--</span></div>
         <div>PACKETS RX: <br><span id="diag-rx" style="color: var(--lcd-text-dim);">--</span></div>
         <div>PACKET LOSS: <br><span id="diag-loss" style="color: var(--lcd-text-dim);">--</span></div>
-        <div style="grid-column: 1 / -1;">LAST PAYLOAD: <br><span id="diag-payload" style="color: var(--lcd-text-dim); word-break: break-all;">--</span></div>
+        <div style="grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; border-top: 2px dashed var(--lcd-text-dim); padding-top: 12px;">
+          <div>LAST PAYLOAD: <br><span id="diag-payload" style="color: var(--lcd-text-dim); word-break: break-all;">--</span></div>
+          <button class="pill" style="border: 2px solid var(--lcd-text); font-weight: bold; color: var(--lcd-text); padding: 8px 16px; white-space: nowrap;" onclick="resetRelayMetrics()">RESET RX STATS</button>
+        </div>
       </div>
-    </div>
-
-    <!-- Footer / Tools -->
-    <div class="settings-bar">
-      <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-        <span>SIM DATE:</span>
-        <input type="date" id="sim-date">
-        <button onclick="updateSimDate()">SET</button>
-        <span style="margin-left: 20px;">CSV DATA:</span>
-        <select id="csv-file-select"></select>
-        <button onclick="loadSelectedCSV()">LOAD</button>
-        <button style="margin-left: 20px;" onclick="resetRelayMetrics()">RESET RX STATS</button>
-        <span id="csv-status" style="margin-left: 8px; color: var(--lcd-text-dim);"></span>
-      </div>
-      <div id="last-update">LAST SYNC: --</div>
     </div>
 
   </div>
@@ -625,10 +674,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
 <script>
 let dashboardData = {};
+let appMode = 'live';
 let mainChartInstance = null;
 let currentMetric = 'temperature';
 let currentSummary = 'now';
-let currentTimeframe = 'today';
+let currentTimeframe = '3h';
 let lastDashboardHash = '';
 
 // Shared LCD styling variables
@@ -643,13 +693,69 @@ const chartConfigs = {
   battery_percent: { label: 'BATT (%)' }
 };
 
+function setMode(mode) {
+  appMode = mode;
+  document.getElementById('btn-mode-live').classList.toggle('active', mode === 'live');
+  document.getElementById('btn-mode-replay').classList.toggle('active', mode === 'replay');
+  
+  document.getElementById('hero-section').style.display = mode === 'live' ? 'flex' : 'none';
+  document.getElementById('settings-section').style.display = mode === 'replay' ? 'block' : 'none';
+  document.getElementById('status-badge-container').style.display = mode === 'live' ? 'flex' : 'none';
+  document.getElementById('diagnostics-btn-container').style.display = mode === 'live' ? 'block' : 'none';
+  document.getElementById('diagnostics-panel').style.display = 'none';
+  
+  // Forcefully destroy the chart on mode switch to guarantee a clean slate
+  if (mainChartInstance) {
+    mainChartInstance.destroy();
+    mainChartInstance = null;
+  }
+
+  document.querySelectorAll('.live-only-time').forEach(el => el.style.display = mode === 'live' ? 'inline-block' : 'none');
+  document.getElementById('custom-time-container').style.display = mode === 'replay' ? 'flex' : 'none';
+
+  if (mode === 'replay' && ['1h', '3h', '12h'].includes(currentTimeframe)) {
+    currentTimeframe = 'today';
+    document.querySelectorAll('#time-toggles button').forEach(b => b.classList.remove('active'));
+    document.querySelector('button[data-time="today"]').classList.add('active');
+  }
+  if (mode === 'live' && currentTimeframe === 'custom') {
+    currentTimeframe = '3h';
+    document.querySelectorAll('#time-toggles button').forEach(b => b.classList.remove('active'));
+    document.querySelector('button[data-time="3h"]').classList.add('active');
+  }
+
+  const btnNow = document.querySelector('button[data-sum="now"]');
+  const btnToday = document.querySelector('button[data-sum="today"]');
+  if (mode === 'replay') {
+    btnNow.style.display = 'none';
+    btnToday.style.display = 'inline-block';
+    if (currentSummary === 'now') {
+      currentSummary = 'today';
+      document.querySelectorAll('#summary-toggles button').forEach(b => b.classList.remove('active'));
+      btnToday.classList.add('active');
+    }
+  } else {
+    btnNow.style.display = 'inline-block';
+    btnToday.style.display = 'none';
+    if (currentSummary === 'today') {
+      currentSummary = 'now';
+      document.querySelectorAll('#summary-toggles button').forEach(b => b.classList.remove('active'));
+      btnNow.classList.add('active');
+    }
+  }
+
+  lastDashboardHash = '';
+  loadSettings();
+  fetchDashboard(true);
+}
+
 async function fetchDashboard(isInit = false) {
   try {
-    const url = isInit ? '/api/dashboard?init=true' : '/api/dashboard';
+    const url = '/api/dashboard?mode=' + appMode + '&_t=' + Date.now() + (isInit ? '&init=true' : '');
     const res = await fetch(url);
     const newData = await res.json();
     
-    const newHash = (newData.latest ? newData.latest.timestamp : 'no-live') + newData.simulated_today + 
+    const newHash = appMode + (newData.latest ? newData.latest.timestamp : 'no-live') + newData.simulated_today + 
                     (newData.relay_status ? newData.relay_status.packets_received + '-' + newData.relay_status.errors : '');
     
     if (newHash !== lastDashboardHash) {
@@ -657,6 +763,11 @@ async function fetchDashboard(isInit = false) {
       lastDashboardHash = newHash;
       updateUI();
       renderChart();
+      
+      // Force layout resolution on first load to prevent 0x0 invisible canvas bug
+      if (isInit) {
+        setTimeout(() => { if (mainChartInstance) mainChartInstance.resize(); }, 150);
+      }
     }
   } catch (err) {
     console.error("Failed to load dashboard:", err);
@@ -678,13 +789,25 @@ function updateUI() {
     
     const readingDate = new Date(live.timestamp);
     document.getElementById('reading-time').textContent = `DATA @ ${readingDate.toLocaleTimeString('en-US', {hour12: false})}`;
-    renderSummary();
-    updateSegments(live, dashboardData.charts.today);
+    updateSegments(live, dashboardData.charts.week);
+  } else {
+    document.getElementById('curr-temp').textContent = '--';
+    document.getElementById('curr-hum').textContent = '--%';
+    document.getElementById('curr-pres').textContent = '-- hPa';
+    document.getElementById('curr-bat').textContent = '--%';
+    document.getElementById('bat-fill').style.width = '0%';
+    document.getElementById('reading-time').textContent = 'DATA @ --:--:--';
+    document.querySelectorAll('.lcd-segment').forEach(el => el.classList.remove('active'));
   }
 
-  if (stats && stats.temp_high !== null) {
+  renderSummary();
+
+  if (stats && stats.temp_high !== undefined && stats.temp_high !== null) {
     document.getElementById('hi-temp').textContent = stats.temp_high.toFixed(1);
     document.getElementById('lo-temp').textContent = stats.temp_low.toFixed(1);
+  } else {
+    document.getElementById('hi-temp').textContent = '--';
+    document.getElementById('lo-temp').textContent = '--';
   }
 
   if (dashboardData.relay_status) {
@@ -704,20 +827,24 @@ function updateUI() {
   }
 
   document.getElementById('sim-date').value = dashboardData.simulated_today;
-  
-  const now = new Date();
-  const timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
-  document.getElementById('last-update').textContent = `LAST SYNC: ${timeStr}`;
 }
 
 function updateSegments(live, readings) {
   if (!live) return;
   
-  document.getElementById('seg-hum-dry').classList.toggle('active', live.humidity < 40);
-  document.getElementById('seg-hum-comf').classList.toggle('active', live.humidity >= 40 && live.humidity <= 60);
-  document.getElementById('seg-hum-wet').classList.toggle('active', live.humidity > 60);
+  const setSegment = (id, isActive, criteria) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.classList.toggle('active', isActive);
+      el.title = isActive ? `Active: ${criteria}` : `Condition: ${criteria}`;
+    }
+  };
+  
+  setSegment('seg-hum-dry', live.humidity < 40, 'Humidity < 40%');
+  setSegment('seg-hum-comf', live.humidity >= 40 && live.humidity <= 60, 'Humidity 40% to 60%');
+  setSegment('seg-hum-wet', live.humidity > 60, 'Humidity > 60%');
 
-  document.getElementById('seg-bat-low').classList.toggle('active', live.battery_percent < 20);
+  setSegment('seg-bat-low', live.battery_percent < 20, 'Battery < 20%');
 
   let past = live;
   if (readings && readings.length > 0) {
@@ -726,50 +853,108 @@ function updateSegments(live, readings) {
   }
 
   const tempDiff = live.temperature - past.temperature;
-  document.getElementById('seg-temp-up').classList.toggle('active', tempDiff > 0.5);
-  document.getElementById('seg-temp-std').classList.toggle('active', tempDiff >= -0.5 && tempDiff <= 0.5);
-  document.getElementById('seg-temp-dn').classList.toggle('active', tempDiff < -0.5);
+  setSegment('seg-temp-up', tempDiff > 0.5, 'Temp increased > +0.5°C/hr');
+  setSegment('seg-temp-std', tempDiff >= -0.5 && tempDiff <= 0.5, 'Temp changed ≤ 0.5°C/hr');
+  setSegment('seg-temp-dn', tempDiff < -0.5, 'Temp decreased < -0.5°C/hr');
 
   const presDiff = live.pressure - past.pressure;
-  document.getElementById('seg-pres-up').classList.toggle('active', presDiff > 1);
-  document.getElementById('seg-pres-std').classList.toggle('active', presDiff >= -1 && presDiff <= 1);
-  document.getElementById('seg-pres-dn').classList.toggle('active', presDiff < -1);
+  setSegment('seg-pres-up', presDiff > 1, 'Pressure increased > +1.0 hPa/hr');
+  setSegment('seg-pres-std', presDiff >= -1 && presDiff <= 1, 'Pressure changed ≤ 1.0 hPa/hr');
+  setSegment('seg-pres-dn', presDiff < -1, 'Pressure decreased < -1.0 hPa/hr');
 }
 
 function renderChart() {
   const ctx = document.getElementById('mainChart');
   if (!ctx) return;
 
-  let rawData = [];
-  if (['1h', '3h', '12h'].includes(currentTimeframe)) {
-    if (dashboardData.latest && dashboardData.charts.three_days) {
-      const latestMs = new Date(dashboardData.latest.timestamp).getTime();
-      const hours = currentTimeframe === '1h' ? 1 : (currentTimeframe === '3h' ? 3 : 12);
-      const cutoff = latestMs - (hours * 60 * 60 * 1000);
-      rawData = dashboardData.charts.three_days.filter(r => new Date(r.timestamp).getTime() >= cutoff);
-    }
+  // 1. Establish the exact start and end times for the X-axis
+  let startMs, endMs;
+  let hours = 24;
+
+  if (currentTimeframe === 'custom') {
+    const startVal = document.getElementById('custom-start').value || '00:00';
+    const endVal = document.getElementById('custom-end').value || '23:59';
+    startMs = new Date(dashboardData.simulated_today + 'T' + startVal + ':00').getTime();
+    endMs = new Date(dashboardData.simulated_today + 'T' + endVal + ':59').getTime();
+    hours = (endMs - startMs) / (1000 * 60 * 60);
+  } else if (appMode === 'replay' && currentTimeframe === 'today') {
+    startMs = new Date(dashboardData.simulated_today + 'T00:00:00').getTime();
+    endMs = new Date(dashboardData.simulated_today + 'T23:59:59').getTime();
+    hours = 24;
   } else {
-    rawData = dashboardData.charts[currentTimeframe] || [];
+    let nowMs = Date.now();
+    if (dashboardData.latest && appMode === 'live') {
+      nowMs = new Date(dashboardData.latest.timestamp).getTime();
+    } else if (dashboardData.simulated_today) {
+      nowMs = new Date(dashboardData.simulated_today + 'T23:59:59').getTime();
+    }
+    if (currentTimeframe === '1h') hours = 1;
+    else if (currentTimeframe === '3h') hours = 3;
+    else if (currentTimeframe === '12h') hours = 12;
+    else if (currentTimeframe === 'three_days') hours = 72;
+    else if (currentTimeframe === 'week') hours = 24 * 7;
+    startMs = nowMs - (hours * 60 * 60 * 1000);
+    endMs = nowMs;
+  }
+
+  // 2. Fetch the largest possible dataset and map timestamps for speed
+  let rawData = [];
+  if (dashboardData.charts && dashboardData.charts.week) {
+    for (let i = 0; i < dashboardData.charts.week.length; i++) {
+      let r = dashboardData.charts.week[i];
+      let t = new Date(r.timestamp).getTime();
+      if (t >= startMs && t <= endMs) {
+        rawData.push({ val: r[currentMetric], t: t });
+      }
+    }
   }
   
   let targetPoints = 150;
-  let step = Math.ceil(rawData.length / targetPoints);
-  let plotData = rawData.filter((_, i) => i % step === 0);
+  let stepMs = Math.max(1, (endMs - startMs) / targetPoints);
+  let labels = [];
+  let dataPoints = [];
+  let maxAllowedDistance = Math.max(5 * 60 * 1000, stepMs);
 
-  const labels = plotData.map(r => {
-    let d = new Date(r.timestamp);
-    if(['today', '1h', '3h', '12h'].includes(currentTimeframe)) return d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-    return [
-      d.toLocaleDateString([], {month:'short', day:'numeric'}), 
-      d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
-    ];
-  });
-  
-  const dataPoints = plotData.map(r => r[currentMetric]);
+  // 3. Create time buckets and inject `null` if no data exists nearby
+  for (let i = 0; i <= targetPoints; i++) {
+    let bucketTime = startMs + (i * stepMs);
+    
+    let closestReading = null;
+    let minDiff = Infinity;
+    for (let j = 0; j < rawData.length; j++) {
+      let diff = Math.abs(rawData[j].t - bucketTime);
+      if (diff < minDiff) {
+        minDiff = diff;
+        closestReading = rawData[j];
+      }
+    }
+    
+    if (closestReading && minDiff <= maxAllowedDistance) {
+      dataPoints.push(closestReading.val);
+    } else {
+      dataPoints.push(null);
+    }
+
+    let d = new Date(bucketTime);
+    if (hours <= 24) {
+      labels.push(d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}));
+    } else {
+      labels.push([
+        d.toLocaleDateString([], {month:'short', day:'numeric'}), 
+        d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+      ]);
+    }
+  }
+
   const config = chartConfigs[currentMetric];
 
   if (mainChartInstance) {
-    mainChartInstance.destroy();
+    mainChartInstance.data.labels = labels;
+    mainChartInstance.data.datasets[0].label = config.label;
+    mainChartInstance.data.datasets[0].data = dataPoints;
+    mainChartInstance.options.scales.y.title.text = config.label;
+    mainChartInstance.update();
+    return;
   }
 
   mainChartInstance = new Chart(ctx, {
@@ -806,16 +991,38 @@ function renderChart() {
       },
       scales: {
         x: { 
-          grid: { color: lcdDim, lineWidth: 1 }, 
+          border: { display: true, color: lcdDark, width: 3 },
+          grid: { color: lcdDark, drawOnChartArea: false, lineWidth: 2 }, 
           ticks: { color: lcdDark, font: {family: 'Share Tech Mono', size: 14}, maxTicksLimit: 8 } 
         },
         y: { 
+          border: { display: true, color: lcdDark, width: 3 },
           title: { display: true, text: config.label, color: lcdDark, font: { family: 'Share Tech Mono', size: 14 } },
-          grid: { color: lcdDim, lineWidth: 1 }, 
+          grid: { color: lcdDark, drawOnChartArea: false, lineWidth: 2 }, 
           ticks: { color: lcdDark, font: {family: 'Share Tech Mono', size: 14} } 
         }
       }
-    }
+    },
+    plugins: [{
+      id: 'matrixGrid',
+      beforeDraw: (chart) => {
+        const { ctx, chartArea } = chart;
+        if (!chartArea) return;
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(chartArea.left, chartArea.top, chartArea.width, chartArea.height);
+        ctx.clip();
+        ctx.strokeStyle = 'rgba(23, 27, 18, 0.15)';
+        ctx.lineWidth = 1;
+        for (let x = chartArea.left; x <= chartArea.right; x += 20) {
+          ctx.beginPath(); ctx.moveTo(x, chartArea.top); ctx.lineTo(x, chartArea.bottom); ctx.stroke();
+        }
+        for (let y = chartArea.top; y <= chartArea.bottom; y += 20) {
+          ctx.beginPath(); ctx.moveTo(chartArea.left, y); ctx.lineTo(chartArea.right, y); ctx.stroke();
+        }
+        ctx.restore();
+      }
+    }]
   });
 }
 
@@ -878,7 +1085,10 @@ function renderSummary() {
   }
 
   let daysData = [];
-  if (currentSummary === 'yesterday') {
+  if (currentSummary === 'today') {
+    daysData = [{ date: dashboardData.simulated_today, stats: dashboardData.stats_today }];
+    tagline.textContent = 'FULL DAY AGGREGATE: TODAY';
+  } else if (currentSummary === 'yesterday') {
     daysData = dashboardData.stats_yesterday;
     tagline.textContent = 'FULL DAY AGGREGATE: YESTERDAY';
   } else if (currentSummary === '3days') {
@@ -895,7 +1105,7 @@ function renderSummary() {
   }
 
   if (currentSummary === '3days') {
-    container.style.gridTemplateColumns = 'repeat(auto-fit, minmax(220px, 1fr))';
+    container.style.gridTemplateColumns = 'repeat(3, 1fr)';
   } else {
     container.style.gridTemplateColumns = '1fr';
   }
@@ -1019,12 +1229,30 @@ document.getElementById('time-toggles').addEventListener('click', (e) => {
   }
 });
 
+function applyCustomRange() {
+  const startVal = document.getElementById('custom-start').value;
+  const endVal = document.getElementById('custom-end').value;
+  
+  if (!startVal || !endVal) {
+    alert("PLEASE SELECT BOTH START AND END TIMES.");
+    return;
+  }
+  if (startVal >= endVal) {
+    alert("START TIME MUST BE BEFORE END TIME.");
+    return;
+  }
+  
+  document.querySelectorAll('#time-toggles button').forEach(b => b.classList.remove('active'));
+  currentTimeframe = 'custom';
+  renderChart();
+}
+
 async function updateSimDate() {
   const date = document.getElementById('sim-date').value;
   await fetch('/api/set-today', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ date })
+    body: JSON.stringify({ date, mode: appMode })
   });
   lastDashboardHash = '';
   fetchDashboard(true);
@@ -1032,7 +1260,7 @@ async function updateSimDate() {
 
 async function loadSettings() {
   try {
-    const res = await fetch('/api/settings');
+    const res = await fetch('/api/settings?mode=' + appMode + '&_t=' + Date.now());
     const data = await res.json();
     const select = document.getElementById('csv-file-select');
     if (data.csv_files && data.csv_files.length) {
@@ -1049,7 +1277,7 @@ async function loadSelectedCSV() {
   if (!filename || filename === 'NO CSV FILES') return;
   statusEl.textContent = "LOADING...";
   try {
-    const res = await fetch('/api/load-csv', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({filename, clear_existing: true}) });
+    const res = await fetch('/api/load-csv', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({filename, clear_existing: true, mode: 'replay'}) });
     const data = await res.json();
     if (data.error) statusEl.textContent = `ERR: ${data.error}`;
     else { statusEl.textContent = `OK: ${data.inserted} ROWS`; lastDashboardHash = ''; fetchDashboard(true); }
@@ -1058,7 +1286,14 @@ async function loadSelectedCSV() {
 }
 
 async function resetRelayMetrics() {
-  await fetch('/api/reset-relay-metrics', { method: 'POST' });
+  await fetch('/api/reset-relay-metrics', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({mode: appMode}) });
+  lastDashboardHash = '';
+  fetchDashboard(true);
+}
+
+async function clearReplayDB() {
+  if(!confirm("Clear all data in REPLAY database?")) return;
+  await fetch('/api/clear-replay', { method: 'POST' });
   lastDashboardHash = '';
   fetchDashboard(true);
 }
@@ -1102,9 +1337,17 @@ setInterval(updateLiveClock, 1000);
 updateLiveClock();
 
 // Boot up
-loadSettings();
-fetchDashboard(true);
-setInterval(() => fetchDashboard(false), 5000); 
+const bootApp = () => {
+  loadSettings();
+  fetchDashboard(true);
+  setInterval(() => fetchDashboard(false), 5000); 
+};
+
+if (document.fonts && document.fonts.ready) {
+  document.fonts.ready.then(bootApp);
+} else {
+  window.addEventListener('load', bootApp);
+}
 
 </script>
 </body>
@@ -1114,7 +1357,10 @@ setInterval(() => fetchDashboard(false), 5000);
 # ─── Entry Point ──────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    init_db()
+    init_db(LIVE_DB_PATH)
+    if os.path.exists(REPLAY_DB_PATH):
+        os.remove(REPLAY_DB_PATH)
+    init_db(REPLAY_DB_PATH)
     os.makedirs(os.path.join(os.path.dirname(__file__), "archive"), exist_ok=True)
     print("=" * 60)
     print("  Weather Station Dashboard (V3 - LCD Theme)")

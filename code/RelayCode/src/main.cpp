@@ -56,10 +56,6 @@ void handleRoot() {
           "</div>";
   html += "<div class=\"stat\"><b>ESP-NOW Packets Received:</b> " +
           String(packetsReceived) + "</div>";
-  html += "<div class=\"stat\"><b>Latest ESP-NOW Packet:</b> " +
-          (incomingDataString == "" ? "None" : incomingDataString) + "</div>";
-  html += "<div class=\"stat\"><b>Last HTTP Response Code:</b> " +
-          String(lastHttpResponse) + "</div>";
 
   String lossStr = "--";
   if (firstPacketReceived) {
@@ -72,6 +68,10 @@ void handleRoot() {
   html +=
       "<div class=\"stat\"><b>Rolling Packet Loss:</b> " + lossStr + "</div>";
 
+  html += "<div class=\"stat\"><b>Latest ESP-NOW Packet:</b> " +
+          (incomingDataString == "" ? "None" : incomingDataString) + "</div>";
+  html += "<div class=\"stat\"><b>Last HTTP Response Code:</b> " +
+          String(lastHttpResponse) + "</div>";
   html += "<div class=\"stat\"><b>Offline Buffer Status:</b> " +
           String(bufferCount) + " / " + String(MAX_BUFFER_SIZE) + "</div>";
 
