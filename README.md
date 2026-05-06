@@ -99,4 +99,4 @@ All physical enclosures for the project were custom modeled in CAD to fit the be
 * **Stevenson Screen (Weather Station):** 
   A classic multi-louvered meteorological enclosure. It is specifically designed to shield the BME280 sensor from direct UV radiation and precipitation while allowing ambient wind/air to freely pass through. This prevents artificial greenhouse heating inside the case, ensuring the temperature readings are a true reflection of the outside air.
 * **Low-Profile Relay Case:** 
-  A sleek, minimalistic enclosure designed to sit unobtrusively inside the house. It perfectly houses the ESP8266, providing adequate ventilation while looking like a commercial off-the-shelf smart home hub.
+  This enclosure can be found at [Makerworld](https://makerworld.com/en/models/58547-nodemcu-v2-cp2102-cover#profileId-60347). Credit to Lyron for the original design. A hole was cut onto th etop for the heatsink.
