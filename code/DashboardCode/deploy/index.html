@@ -1,0 +1,1064 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1400">
+    <title>Solar Weather Station | Portfolio Showcase</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bezel: #e4e2d7;
+            --lcd-bg: #9eb084;
+            --lcd-text: #171b12;
+            --lcd-text-dim: #38422a;
+            --font-lcd: 'Share Tech Mono', monospace;
+            --bg-dark: #1e1e1e;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background: var(--bg-dark);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 40px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            color: #e4e2d7;
+        }
+
+        /* ─── Portfolio Pitch Sidebar ─── */
+        .portfolio-wrapper {
+            display: flex;
+            gap: 40px;
+            max-width: 1600px;
+            width: 100%;
+            align-items: flex-start;
+        }
+
+        .pitch-sidebar {
+            flex: 0 0 400px;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .pitch-sidebar h1 {
+            color: var(--lcd-bg);
+            font-size: 2.2rem;
+            margin-bottom: 10px;
+            line-height: 1.1;
+        }
+
+        .pitch-sidebar p {
+            color: #a0a0a0;
+            line-height: 1.6;
+            margin-bottom: 20px;
+            font-size: 1.05rem;
+        }
+
+        .feature-list {
+            list-style: none;
+            margin-bottom: 20px;
+        }
+
+        .feature-list li {
+            position: relative;
+            padding-left: 25px;
+            margin-bottom: 15px;
+            line-height: 1.5;
+        }
+
+        .feature-list li::before {
+            content: '►';
+            position: absolute;
+            left: 0;
+            color: var(--lcd-bg);
+            font-size: 0.8rem;
+            top: 3px;
+        }
+
+        .feature-list strong {
+            color: #fff;
+            display: block;
+            margin-bottom: 2px;
+        }
+
+        .tech-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 20px;
+            border-top: 1px solid #333;
+            padding-top: 20px;
+        }
+
+        .tech-tag {
+            background: #333;
+            color: #ccc;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: bold;
+        }
+
+        /* ─── Device Bezel ─── */
+        .device-container {
+            flex: 1;
+            max-width: 1000px;
+        }
+
+        .device-bezel {
+            background: var(--bezel);
+            padding: 30px 40px 40px 40px;
+            border-radius: 8px;
+            box-shadow:
+                0 20px 50px rgba(0, 0, 0, 0.8),
+                inset 0 4px 10px rgba(255, 255, 255, 0.8),
+                inset 0 -4px 10px rgba(0, 0, 0, 0.15);
+            width: 100%;
+        }
+
+        .device-logo {
+            font-family: Arial, sans-serif;
+            color: #8a887e;
+            font-size: 1.2rem;
+            font-style: italic;
+            font-weight: 900;
+            text-align: left;
+            margin-bottom: 20px;
+            letter-spacing: 2px;
+        }
+
+        .lcd-screen {
+            background: var(--lcd-bg);
+            font-family: var(--font-lcd);
+            border: 10px solid #5a5a5a;
+            border-bottom-color: #dcdcdc;
+            border-right-color: #dcdcdc;
+            border-top-color: #4a4a4a;
+            border-left-color: #4a4a4a;
+            padding: 20px;
+            color: var(--lcd-text);
+            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.15);
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* ─── Header ─── */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 3px solid var(--lcd-text);
+            padding-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .brand {
+            font-size: 2rem;
+            font-weight: bold;
+            letter-spacing: 2px;
+            display: flex;
+            align-items: center;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 1.5rem;
+        }
+
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0;
+            }
+        }
+
+        .status-dot {
+            width: 16px;
+            height: 16px;
+            background: var(--lcd-text);
+            border-radius: 2px;
+        }
+
+        .status-dot.active {
+            animation: blink 1s infinite steps(2, start);
+        }
+
+        /* ─── Main Readouts ─── */
+        .hero {
+            display: flex;
+            gap: 16px;
+            border-bottom: 3px solid var(--lcd-text);
+            padding-bottom: 20px;
+        }
+
+        @keyframes pulse-segment {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.4;
+            }
+        }
+
+        .lcd-segment {
+            color: var(--lcd-text);
+            opacity: 0.12;
+            line-height: 1.2;
+            cursor: help;
+            user-select: none;
+            font-weight: bold;
+            transition: opacity 0.3s;
+        }
+
+        .lcd-segment.active {
+            opacity: 1;
+            animation: pulse-segment 2s infinite ease-in-out;
+        }
+
+        .main-temp {
+            flex: 2;
+            border: 3px solid var(--lcd-text);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .temp-label {
+            font-size: 1.5rem;
+            letter-spacing: 1px;
+            width: 100%;
+            text-align: left;
+            border-bottom: 2px dashed var(--lcd-text-dim);
+            margin-bottom: 10px;
+            padding-bottom: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            flex-wrap: wrap;
+        }
+
+        .temp-val {
+            font-size: 8rem;
+            line-height: 1;
+        }
+
+        .temp-unit {
+            font-size: 4rem;
+            vertical-align: super;
+        }
+
+        .temp-meta {
+            display: flex;
+            gap: 30px;
+            font-size: 1.5rem;
+            margin-top: 10px;
+            width: 100%;
+            justify-content: space-between;
+            border-top: 2px dashed var(--lcd-text-dim);
+            padding-top: 10px;
+        }
+
+        .side-cards {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .mini-card {
+            border: 3px solid var(--lcd-text);
+            padding: 12px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .mc-label {
+            font-size: 1.2rem;
+            border-bottom: 2px solid var(--lcd-text);
+            padding-bottom: 4px;
+            margin-bottom: 8px;
+        }
+
+        .mc-val {
+            font-size: 2.5rem;
+            text-align: right;
+        }
+
+        .bat-bar-bg {
+            width: 100%;
+            height: 16px;
+            border: 2px solid var(--lcd-text);
+            padding: 2px;
+            margin-top: 8px;
+        }
+
+        .bat-bar-fg {
+            height: 100%;
+            background: var(--lcd-text);
+        }
+
+        /* ─── Summary Section ─── */
+        .summary-section {
+            border-bottom: 3px solid var(--lcd-text);
+            padding-bottom: 20px;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 16px;
+            margin-top: 10px;
+        }
+
+        .summary-card {
+            border: 3px solid var(--lcd-text);
+            padding: 12px;
+            margin-top: 10px;
+        }
+
+        .sc-label {
+            font-size: 1.2rem;
+            border-bottom: 2px solid var(--lcd-text);
+            padding-bottom: 4px;
+            margin-bottom: 8px;
+        }
+
+        .sc-values {
+            display: flex;
+            justify-content: space-between;
+            text-align: center;
+        }
+
+        .sc-col {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            border-right: 2px dashed var(--lcd-text-dim);
+        }
+
+        .sc-col:last-child {
+            border-right: none;
+        }
+
+        .sc-col-title {
+            font-size: 1rem;
+            color: var(--lcd-text-dim);
+            margin-bottom: 4px;
+        }
+
+        .sc-val {
+            font-size: 1.5rem;
+        }
+
+        /* ─── Chart Section ─── */
+        .chart-section {
+            border-bottom: 3px solid var(--lcd-text);
+            padding-bottom: 20px;
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .pill-group {
+            display: flex;
+            gap: 4px;
+        }
+
+        .pill {
+            background: transparent;
+            color: var(--lcd-text-dim);
+            border: 2px solid var(--lcd-text-dim);
+            padding: 4px 12px;
+            font-family: var(--font-lcd);
+            font-size: 1.2rem;
+            cursor: pointer;
+        }
+
+        .pill:hover {
+            border-color: var(--lcd-text);
+            color: var(--lcd-text);
+        }
+
+        .pill.active {
+            background: var(--lcd-text);
+            color: var(--lcd-bg);
+            border-color: var(--lcd-text);
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+            border: 3px solid var(--lcd-text);
+            padding: 10px;
+            overflow: hidden;
+            display: block;
+            box-sizing: border-box;
+        }
+
+        /* ─── Replay Section ─── */
+        .replay-section {
+            border-bottom: 3px solid var(--lcd-text);
+            padding-bottom: 20px;
+        }
+
+        .replay-section select {
+            background: transparent;
+            border: 2px solid var(--lcd-text);
+            color: var(--lcd-text);
+            font-family: var(--font-lcd);
+            font-size: 1.2rem;
+            padding: 4px 8px;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .replay-section button {
+            background: var(--lcd-text);
+            color: var(--lcd-bg);
+            border: 2px solid var(--lcd-text);
+            font-family: var(--font-lcd);
+            font-size: 1.2rem;
+            padding: 4px 16px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="portfolio-wrapper">
+
+        <!-- Project Pitch / Selling Points -->
+        <div class="pitch-sidebar">
+            <h1>Solar Weather Station</h1>
+            <p>A completely off-grid IoT environmental telemetry system featuring custom-routed hardware, low-power RF
+                networking, and a full-stack interactive dashboard.</p>
+
+            <ul class="feature-list">
+                <li>
+                    <strong>Decoupled RF Architecture</strong>
+                    Utilizes a low-latency ESP-NOW bridge to transition telemetry to the local network, drastically
+                    reducing battery drain compared to direct WiFi connections.
+                </li>
+                <li>
+                    <strong>Aggressive Deep-Sleep Optimization</strong>
+                    Remote C++ ESP32 logic shuts off non-essential silicon (modems, LEDs) maintaining an ultra-low 4mA
+                    weighted average draw.
+                </li>
+                <li>
+                    <strong>Fault-Tolerant Memory Buffers</strong>
+                    Prevents data loss during network dropouts using real-time RTC memory buffering on the edge node and
+                    local SD Card CSV logging.
+                </li>
+                <li>
+                    <strong>Bespoke Hardware Enclosures</strong>
+                    Features a custom PCB and a 3D-printed Stevenson screen designed in Fusion 360 to ensure true
+                    thermal isolation for the BME280 sensor.
+                </li>
+            </ul>
+
+            <div class="tech-tags">
+                <span class="tech-tag">C/C++</span>
+                <span class="tech-tag">ESP32 & ESP8266</span>
+                <span class="tech-tag">JavaScript / HTML</span>
+                <span class="tech-tag">Chart.js</span>
+                <span class="tech-tag">PCB Design</span>
+                <span class="tech-tag">Fusion 360</span>
+                <span class="tech-tag">ESP-NOW</span>
+            </div>
+        </div>
+
+        <!-- Interactive Dashboard -->
+        <div class="device-container">
+            <div class="device-bezel">
+                <div class="device-logo">WEATHER MONITOR // STATIC SHOWCASE</div>
+                <div class="lcd-screen">
+
+                    <!-- Header -->
+                    <header>
+                        <div class="brand">
+                            DATA REPLAY <span id="live-clock"
+                                style="font-size: 1.2rem; margin-left: 20px; color: var(--lcd-text-dim);">--:--:--</span>
+                        </div>
+                        <div class="status-badge" id="status-badge-container">
+                            <span id="live-text">RX: ARCHIVE</span>
+                            <div class="status-dot active"></div>
+                        </div>
+                    </header>
+
+                    <!-- Hero Stats -->
+                    <div class="hero" id="hero-section">
+                        <div class="main-temp">
+                            <div class="temp-label">
+                                <span>TEMPERATURE</span>
+                                <span id="reading-time" style="font-size: 1.2rem; color: var(--lcd-text-dim);">DATA @
+                                    --:--:--</span>
+                            </div>
+                            <div
+                                style="display: flex; width: 100%; justify-content: space-between; align-items: center; padding: 10px 0;">
+                                <div><span class="temp-val" id="curr-temp">--</span><span class="temp-unit">°C</span>
+                                </div>
+                                <div style="font-size: 1.5rem; text-align: right; line-height: 1.2;">
+                                    <div id="seg-temp-up" class="lcd-segment">▲</div>
+                                    <div id="seg-temp-std" class="lcd-segment">≈</div>
+                                    <div id="seg-temp-dn" class="lcd-segment">▼</div>
+                                </div>
+                            </div>
+                            <div class="temp-meta">
+                                <div>MIN: <span id="lo-temp">--</span></div>
+                                <div>MAX: <span id="hi-temp">--</span></div>
+                            </div>
+                        </div>
+
+                        <div class="side-cards">
+                            <div class="mini-card">
+                                <div class="mc-label">REL. HUMIDITY</div>
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <div style="font-size: 1.2rem; line-height: 1.2;">
+                                        <div id="seg-hum-dry" class="lcd-segment">DRY</div>
+                                        <div id="seg-hum-comf" class="lcd-segment">COMFORT</div>
+                                        <div id="seg-hum-wet" class="lcd-segment">WET</div>
+                                    </div>
+                                    <div class="mc-val" id="curr-hum">--%</div>
+                                </div>
+                            </div>
+                            <div class="mini-card">
+                                <div class="mc-label">ABS. PRESSURE</div>
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <div style="font-size: 1.2rem; line-height: 1.2;">
+                                        <div id="seg-pres-up" class="lcd-segment">▲</div>
+                                        <div id="seg-pres-std" class="lcd-segment">≈</div>
+                                        <div id="seg-pres-dn" class="lcd-segment">▼</div>
+                                    </div>
+                                    <div class="mc-val" id="curr-pres">-- hPa</div>
+                                </div>
+                            </div>
+                            <div class="mini-card" style="padding-bottom: 8px;">
+                                <div style="display:flex; justify-content: space-between; align-items: center;">
+                                    <div class="mc-label" style="border:none; margin:0; padding:0;">BATTERY</div>
+                                    <div id="seg-bat-low" class="lcd-segment"
+                                        style="font-size: 1.2rem; text-align: left; margin-right: 10px; flex-grow: 1; padding-left: 10px;">
+                                        LOW!</div>
+                                    <div class="mc-val" style="font-size: 1.5rem;" id="curr-bat">--%</div>
+                                </div>
+                                <div class="bat-bar-bg">
+                                    <div class="bat-bar-fg" id="bat-fill" style="width: 0%;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Summary Section -->
+                    <div class="summary-section">
+                        <div class="chart-header">
+                            <div>
+                                <div
+                                    style="font-size: 1.5rem; font-weight: bold; border-bottom: 2px solid var(--lcd-text);">
+                                    SUMMARY</div>
+                                <div style="font-size: 1.2rem; color: var(--lcd-text-dim); margin-top: 8px;">FULL DAY
+                                    AGGREGATE</div>
+                            </div>
+                            <div class="controls">
+                                <div class="pill-group" id="summary-toggles">
+                                    <button class="pill active" data-sum="today">TDAY</button>
+                                    <button class="pill" data-sum="yesterday">YDAY</button>
+                                    <button class="pill" data-sum="3days">72H</button>
+                                    <button class="pill" data-sum="week">7D</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="summary-grid" id="summary-container">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+
+                    <!-- Interactive Chart Area -->
+                    <div class="chart-section">
+                        <div class="chart-header">
+                            <div>
+                                <div
+                                    style="font-size: 1.5rem; font-weight: bold; border-bottom: 2px solid var(--lcd-text);">
+                                    LOGGED DATA</div>
+                                <div style="font-size: 1.2rem; color: var(--lcd-text-dim); margin-top: 8px;">SELECT
+                                    METRIC TO VIEW TIMELINE</div>
+                            </div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="mainChart"></canvas>
+                        </div>
+                        <div class="controls" style="justify-content: space-between; margin-top: 12px;">
+                            <div class="pill-group" id="metric-toggles">
+                                <button class="pill active" data-metric="temperature">TEMP</button>
+                                <button class="pill" data-metric="humidity">HUM</button>
+                                <button class="pill" data-metric="pressure">PRES</button>
+                                <button class="pill" data-metric="battery_percent">BATT</button>
+                            </div>
+                            <div class="pill-group" id="time-toggles">
+                                <button class="pill" data-time="1h">1H</button>
+                                <button class="pill" data-time="3h">3H</button>
+                                <button class="pill" data-time="12h">12H</button>
+                                <button class="pill active" data-time="today">24H</button>
+                                <button class="pill" data-time="three_days">72H</button>
+                                <button class="pill" data-time="week">7D</button>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ─── CONFIGURATION ───
+        // Set the default simulated date (YYYY-MM-DD format)
+        const DEFAULT_SIMULATED_DATE = '2026-05-05';
+
+        let dashboardData = null;
+        let mainChartInstance = null;
+        let currentMetric = 'temperature';
+        let currentSummary = 'today';
+        let currentTimeframe = 'today';
+
+        const lcdDark = '#171b12';
+        const lcdBg = '#9eb084';
+
+        const chartConfigs = {
+            temperature: { label: 'TEMP (°C)' },
+            humidity: { label: 'HUM (%)' },
+            pressure: { label: 'PRES (hPa)' },
+            battery_percent: { label: 'BATT (%)' }
+        };
+
+        function getDaysArray(endDateStr, numDays) {
+            let dates = [];
+            let d = new Date(endDateStr + "T12:00:00Z");
+            for (let i = 0; i < numDays; i++) {
+                let nd = new Date(d.getTime() - i * 24 * 60 * 60 * 1000);
+                dates.push(nd.toISOString().split('T')[0]);
+            }
+            return dates;
+        }
+
+        function calcStats(arr) {
+            if (!arr || arr.length === 0) return { count: 0 };
+            let sumT = 0, sumH = 0, sumP = 0, minT = 999, maxT = -999, minH = 999, maxH = -999, minP = 9999, maxP = -9999;
+            arr.forEach(r => {
+                sumT += r.temperature; sumH += r.humidity; sumP += r.pressure;
+                if (r.temperature < minT) minT = r.temperature; if (r.temperature > maxT) maxT = r.temperature;
+                if (r.humidity < minH) minH = r.humidity; if (r.humidity > maxH) maxH = r.humidity;
+                if (r.pressure < minP) minP = r.pressure; if (r.pressure > maxP) maxP = r.pressure;
+            });
+            return {
+                count: arr.length,
+                temp_low: minT, temp_high: maxT, temp_avg: sumT / arr.length,
+                hum_low: minH, hum_high: maxH, hum_avg: sumH / arr.length,
+                pres_low: minP, pres_high: maxP, pres_avg: sumP / arr.length
+            };
+        }
+
+        async function loadDefaultCSV() {
+            const dates = getDaysArray(DEFAULT_SIMULATED_DATE, 7);
+            let combinedCSV = "";
+
+            // Fetch backwards from today down to 7 days ago
+            for (let i = dates.length - 1; i >= 0; i--) {
+                try {
+                    const response = await fetch(`./archive/${dates[i]}.csv`);
+                    if (response.ok) {
+                        combinedCSV += await response.text() + "\n";
+                    }
+                } catch (e) { } // Skip missing days silently
+            }
+
+            if (combinedCSV.trim() !== "") {
+                parseCSVtoDashboardData(combinedCSV, DEFAULT_SIMULATED_DATE);
+            } else {
+                document.getElementById('csv-status').textContent = "ERR: NO CSV DATA FOUND";
+            }
+        }
+
+        function parseCSVtoDashboardData(csvText, simulatedDate) {
+            const lines = csvText.split('\n');
+            const readings = [];
+
+            lines.forEach(line => {
+                if (!line.trim() || line.startsWith('#')) return;
+                const parts = line.split(',');
+                if (parts.length >= 6) {
+                    // Expected Date Format: Mon 10/02/2025 - 13:38:57
+                    const m = parts[0].match(/(\d{2})\/(\d{2})\/(\d{4})\s+-\s+(\d{2}):(\d{2}):(\d{2})/);
+                    if (m) {
+                        const dt = new Date(`${m[3]}-${m[2]}-${m[1]}T${m[4]}:${m[5]}:${m[6]}`);
+                        const t = parseFloat(parts[1]), h = parseFloat(parts[2]), p = parseFloat(parts[3]);
+                        readings.push({
+                            timestamp: dt.toISOString(),
+                            temperature: t,
+                            humidity: h,
+                            pressure: p,
+                            battery_voltage: parseFloat(parts[4]),
+                            battery_percent: parseFloat(parts[5]),
+                            day_date: dt.toISOString().split('T')[0]
+                        });
+                    }
+                }
+            });
+
+            readings.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+            const count = readings.length;
+            if (count === 0) {
+                document.getElementById('csv-status').textContent = "ERR: CSV EMPTY OR INVALID FORMAT";
+                return;
+            }
+
+            const latest = readings[count - 1];
+            const dates = getDaysArray(simulatedDate, 7);
+
+            const groupedByDay = {};
+            dates.forEach(d => groupedByDay[d] = []);
+            readings.forEach(r => { if (groupedByDay[r.day_date]) groupedByDay[r.day_date].push(r); });
+
+            dashboardData = {
+                simulated_today: simulatedDate,
+                latest: latest,
+                stats_today: calcStats(groupedByDay[dates[0]]),
+                stats_yesterday: [{ date: dates[1], stats: calcStats(groupedByDay[dates[1]]) }],
+                stats_3days: [
+                    { date: dates[0], stats: calcStats(groupedByDay[dates[0]]) },
+                    { date: dates[1], stats: calcStats(groupedByDay[dates[1]]) },
+                    { date: dates[2], stats: calcStats(groupedByDay[dates[2]]) }
+                ],
+                stats_week: dates.map(d => ({ date: d, stats: calcStats(groupedByDay[d]) })),
+                charts: { week: readings }
+            };
+
+            updateUI();
+            renderSummary();
+            renderChart();
+        }
+
+        function updateUI() {
+            if (!dashboardData) return;
+            const live = dashboardData.latest;
+            const stats = dashboardData.stats_today;
+
+            document.getElementById('curr-temp').textContent = live.temperature.toFixed(1);
+            document.getElementById('curr-hum').textContent = `${live.humidity.toFixed(1)}%`;
+            document.getElementById('curr-pres').textContent = `${Math.round(live.pressure)} hPa`;
+            document.getElementById('curr-bat').textContent = `${Math.round(live.battery_percent)}%`;
+            document.getElementById('bat-fill').style.width = `${live.battery_percent}%`;
+
+            const readingDate = new Date(live.timestamp);
+            document.getElementById('reading-time').textContent = `DATA @ ${readingDate.toLocaleTimeString('en-US', { hour12: false })}`;
+
+            if (stats.count > 0) {
+                document.getElementById('hi-temp').textContent = stats.temp_high.toFixed(1);
+                document.getElementById('lo-temp').textContent = stats.temp_low.toFixed(1);
+            }
+
+            const simDate = dashboardData.simulated_today;
+            const endDt = new Date(simDate + 'T12:00:00Z');
+            const startDt = new Date(endDt.getTime() - 6 * 24 * 60 * 60 * 1000);
+            const formatStr = (d) => `${d.getUTCDate().toString().padStart(2, '0')}/${(d.getUTCMonth() + 1).toString().padStart(2, '0')}/${d.getUTCFullYear()}`;
+            document.getElementById('live-clock').textContent = `${formatStr(startDt)} TO ${formatStr(endDt)}`;
+
+            updateSegments(live, dashboardData.charts.week);
+        }
+
+        function updateSegments(live, readings) {
+            if (!live) return;
+
+            const setSegment = (id, isActive, criteria) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.classList.toggle('active', isActive);
+                    el.title = isActive ? `Active: ${criteria}` : `Condition: ${criteria}`;
+                }
+            };
+
+            setSegment('seg-hum-dry', live.humidity < 40, 'Humidity < 40%');
+            setSegment('seg-hum-comf', live.humidity >= 40 && live.humidity <= 60, 'Humidity 40% to 60%');
+            setSegment('seg-hum-wet', live.humidity > 60, 'Humidity > 60%');
+
+            setSegment('seg-bat-low', live.battery_percent < 20, 'Battery < 20%');
+
+            let past = live;
+            if (readings && readings.length > 0) {
+                const oneHourAgo = new Date(live.timestamp).getTime() - 60 * 60 * 1000;
+                past = readings.find(r => new Date(r.timestamp).getTime() >= oneHourAgo) || readings[0];
+            }
+
+            const tempDiff = live.temperature - past.temperature;
+            setSegment('seg-temp-up', tempDiff > 0.5, 'Temp increased > +0.5°C/hr');
+            setSegment('seg-temp-std', tempDiff >= -0.5 && tempDiff <= 0.5, 'Temp changed ≤ 0.5°C/hr');
+            setSegment('seg-temp-dn', tempDiff < -0.5, 'Temp decreased < -0.5°C/hr');
+
+            const presDiff = live.pressure - past.pressure;
+            setSegment('seg-pres-up', presDiff > 1, 'Pressure increased > +1.0 hPa/hr');
+            setSegment('seg-pres-std', presDiff >= -1 && presDiff <= 1, 'Pressure changed ≤ 1.0 hPa/hr');
+            setSegment('seg-pres-dn', presDiff < -1, 'Pressure decreased < -1.0 hPa/hr');
+        }
+
+        function renderSummary() {
+            const container = document.getElementById('summary-container');
+            if (!dashboardData) return;
+
+            let daysData = [];
+            if (currentSummary === 'today') {
+                daysData = [{ date: dashboardData.simulated_today, stats: dashboardData.stats_today }];
+            } else if (currentSummary === 'yesterday') {
+                daysData = dashboardData.stats_yesterday;
+            } else if (currentSummary === '3days') {
+                daysData = dashboardData.stats_3days;
+            } else if (currentSummary === 'week') {
+                daysData = dashboardData.stats_week;
+            }
+
+            if (currentSummary === '3days') {
+                container.style.gridTemplateColumns = 'repeat(3, 1fr)';
+            } else {
+                container.style.gridTemplateColumns = '1fr';
+            }
+
+            let html = '';
+            for (let day of daysData) {
+                const stats = day.stats;
+                const dt = new Date(day.date + 'T12:00:00Z');
+                const dateLabel = dt.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' }).toUpperCase();
+
+                if (!stats || stats.count === 0) {
+                    html += `
+                        <div class="summary-card" ${currentSummary !== '3days' ? 'style="display: flex; flex-wrap: wrap; gap: 16px; align-items: center;"' : ''}>
+                            <div class="sc-label" ${currentSummary !== '3days' ? 'style="border: none; margin: 0; padding: 0; min-width: 120px;"' : ''}>${dateLabel}</div>
+                            <div style="flex: 1; font-size: 1.2rem; color: var(--lcd-text-dim); text-align: center; padding: 10px;">NO DATA</div>
+                        </div>
+                    `;
+                    continue;
+                }
+
+                html += `
+                    <div class="summary-card" ${currentSummary !== '3days' ? 'style="display: flex; flex-wrap: wrap; gap: 16px; align-items: center;"' : ''}>
+                        <div class="sc-label" ${currentSummary !== '3days' ? 'style="border: none; margin: 0; padding: 0; min-width: 120px;"' : ''}>${dateLabel}</div>
+                        
+                        <div style="${currentSummary !== '3days' ? 'flex: 1; min-width: 200px;' : 'margin-bottom: 12px;'}">
+                            <div class="sc-col-title" style="color: var(--lcd-text); margin-bottom: 4px; border-bottom: 1px dashed var(--lcd-text-dim); text-align: center;">TEMP (°C)</div>
+                            <div class="sc-values">
+                                <div class="sc-col"><div class="sc-col-title">MAX</div><div class="sc-val">${stats.temp_high.toFixed(1)}</div></div>
+                                <div class="sc-col"><div class="sc-col-title">AVG</div><div class="sc-val">${stats.temp_avg.toFixed(1)}</div></div>
+                                <div class="sc-col"><div class="sc-col-title">MIN</div><div class="sc-val">${stats.temp_low.toFixed(1)}</div></div>
+                            </div>
+                        </div>
+                        <div style="${currentSummary !== '3days' ? 'flex: 1; min-width: 200px;' : 'margin-bottom: 12px;'}">
+                            <div class="sc-col-title" style="color: var(--lcd-text); margin-bottom: 4px; border-bottom: 1px dashed var(--lcd-text-dim); text-align: center;">HUM (%)</div>
+                            <div class="sc-values">
+                                <div class="sc-col"><div class="sc-col-title">MAX</div><div class="sc-val">${stats.hum_high.toFixed(0)}</div></div>
+                                <div class="sc-col"><div class="sc-col-title">AVG</div><div class="sc-val">${stats.hum_avg.toFixed(0)}</div></div>
+                                <div class="sc-col"><div class="sc-col-title">MIN</div><div class="sc-val">${stats.hum_low.toFixed(0)}</div></div>
+                            </div>
+                        </div>
+                        <div style="${currentSummary !== '3days' ? 'flex: 1; min-width: 200px;' : ''}">
+                            <div class="sc-col-title" style="color: var(--lcd-text); margin-bottom: 4px; border-bottom: 1px dashed var(--lcd-text-dim); text-align: center;">PRES (hPa)</div>
+                            <div class="sc-values">
+                                <div class="sc-col"><div class="sc-col-title">MAX</div><div class="sc-val">${stats.pres_high.toFixed(0)}</div></div>
+                                <div class="sc-col"><div class="sc-col-title">AVG</div><div class="sc-val">${stats.pres_avg.toFixed(0)}</div></div>
+                                <div class="sc-col"><div class="sc-col-title">MIN</div><div class="sc-val">${stats.pres_low.toFixed(0)}</div></div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            container.innerHTML = html;
+        }
+
+        function renderChart() {
+            const ctx = document.getElementById('mainChart');
+            if (!ctx || !dashboardData) return;
+
+            const config = chartConfigs[currentMetric];
+            const readings = dashboardData.charts.week;
+
+            // Chart Timeframe scaling logic
+            let startMs, endMs;
+            let hours = 24;
+
+            let nowMs = new Date(dashboardData.simulated_today + 'T23:59:59').getTime();
+
+            if (currentTimeframe === '1h') hours = 1;
+            else if (currentTimeframe === '3h') hours = 3;
+            else if (currentTimeframe === '12h') hours = 12;
+            else if (currentTimeframe === 'today') hours = 24;
+            else if (currentTimeframe === 'three_days') hours = 72;
+            else if (currentTimeframe === 'week') hours = 24 * 7;
+
+            startMs = nowMs - (hours * 60 * 60 * 1000);
+            endMs = nowMs;
+
+            let rawData = [];
+            for (let i = 0; i < readings.length; i++) {
+                let t = new Date(readings[i].timestamp).getTime();
+                if (t >= startMs && t <= endMs) rawData.push({ val: readings[i][currentMetric], t: t });
+            }
+
+            let targetPoints = 150;
+            let stepMs = Math.max(1, (endMs - startMs) / targetPoints);
+            let labels = [];
+            let dataPoints = [];
+            let maxAllowedDistance = Math.max(5 * 60 * 1000, stepMs);
+
+            for (let i = 0; i <= targetPoints; i++) {
+                let bucketTime = startMs + (i * stepMs);
+                let closestReading = null;
+                let minDiff = Infinity;
+
+                for (let j = 0; j < rawData.length; j++) {
+                    let diff = Math.abs(rawData[j].t - bucketTime);
+                    if (diff < minDiff) { minDiff = diff; closestReading = rawData[j]; }
+                }
+
+                dataPoints.push((closestReading && minDiff <= maxAllowedDistance) ? closestReading.val : null);
+
+                let d = new Date(bucketTime);
+                labels.push(hours <= 24 ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : [d.toLocaleDateString([], { month: 'short', day: 'numeric' }), d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })]);
+            }
+
+            if (mainChartInstance) {
+                mainChartInstance.data.labels = labels;
+                mainChartInstance.data.datasets[0].label = config.label;
+                mainChartInstance.data.datasets[0].data = dataPoints;
+                mainChartInstance.options.scales.y.title.text = config.label;
+                mainChartInstance.update();
+                return;
+            }
+
+            mainChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: config.label,
+                        data: dataPoints,
+                        borderColor: lcdDark,
+                        backgroundColor: 'transparent',
+                        borderWidth: 3,
+                        fill: false,
+                        tension: 0,
+                        pointRadius: 2,
+                        pointStyle: 'rect',
+                        pointHoverRadius: 6,
+                        pointHoverBackgroundColor: lcdBg,
+                        pointHoverBorderWidth: 3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: lcdBg, borderColor: lcdDark, borderWidth: 2,
+                            titleColor: lcdDark, bodyColor: lcdDark,
+                            titleFont: { family: 'Share Tech Mono', size: 16 }, bodyFont: { family: 'Share Tech Mono', size: 16 },
+                            padding: 10, cornerRadius: 0, displayColors: false
+                        }
+                    },
+                    scales: {
+                        x: { border: { display: true, color: lcdDark, width: 3 }, grid: { color: lcdDark, drawOnChartArea: false, lineWidth: 2 }, ticks: { color: lcdDark, font: { family: 'Share Tech Mono', size: 14 }, maxTicksLimit: 8 } },
+                        y: { border: { display: true, color: lcdDark, width: 3 }, title: { display: true, text: config.label, color: lcdDark, font: { family: 'Share Tech Mono', size: 14 } }, grid: { color: lcdDark, drawOnChartArea: false, lineWidth: 2 }, ticks: { color: lcdDark, font: { family: 'Share Tech Mono', size: 14 } } }
+                    }
+                },
+                plugins: [{
+                    id: 'matrixGrid',
+                    beforeDraw: (chart) => {
+                        const { ctx, chartArea } = chart;
+                        if (!chartArea) return;
+                        ctx.save();
+                        ctx.beginPath(); ctx.rect(chartArea.left, chartArea.top, chartArea.width, chartArea.height); ctx.clip();
+                        ctx.strokeStyle = 'rgba(23, 27, 18, 0.15)'; ctx.lineWidth = 1;
+                        for (let x = chartArea.left; x <= chartArea.right; x += 20) { ctx.beginPath(); ctx.moveTo(x, chartArea.top); ctx.lineTo(x, chartArea.bottom); ctx.stroke(); }
+                        for (let y = chartArea.top; y <= chartArea.bottom; y += 20) { ctx.beginPath(); ctx.moveTo(chartArea.left, y); ctx.lineTo(chartArea.right, y); ctx.stroke(); }
+                        ctx.restore();
+                    }
+                }]
+            });
+        }
+
+        document.getElementById('summary-toggles').addEventListener('click', (e) => {
+            if (e.target.tagName === 'BUTTON') {
+                document.querySelectorAll('#summary-toggles button').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                currentSummary = e.target.dataset.sum;
+                renderSummary();
+            }
+        });
+
+        document.getElementById('metric-toggles').addEventListener('click', (e) => {
+            if (e.target.tagName === 'BUTTON') {
+                document.querySelectorAll('#metric-toggles button').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                currentMetric = e.target.dataset.metric;
+                renderChart();
+            }
+        });
+
+        document.getElementById('time-toggles').addEventListener('click', (e) => {
+            if (e.target.tagName === 'BUTTON') {
+                document.querySelectorAll('#time-toggles button').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                currentTimeframe = e.target.dataset.time;
+                renderChart();
+            }
+        });
+
+        // Boot up
+        window.addEventListener('load', () => {
+            loadDefaultCSV(); // Auto-load the default CSV on boot
+        });
+
+    </script>
+</body>
+
+</html>

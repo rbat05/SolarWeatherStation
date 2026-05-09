@@ -16,6 +16,9 @@ app = Flask(__name__)
 LIVE_DB_PATH = os.path.join(os.path.dirname(__file__), "weather.db")
 REPLAY_DB_PATH = os.path.join(os.path.dirname(__file__), "replay.db")
 
+# --- SECURITY ---
+INGEST_API_KEY = "my_super_secret_weather_key_123" # Change this to a secure random string!
+
 _cached_metservice = None
 _last_reading_ts = None
 
@@ -162,6 +165,13 @@ def fetch_metservice_current(location: str = "auckland") -> dict | None:
 
 @app.route("/ingest", methods=["POST"])
 def ingest():
+    # --- API KEY SECURITY CHECK ---
+    provided_key = request.headers.get("X-API-Key")
+    if provided_key != INGEST_API_KEY:
+        print("[!] Unauthorized ingest attempt.")
+        return jsonify({"error": "Unauthorized"}), 401
+    # ------------------------------
+
     data = request.get_data(as_text=True).strip()
     contact_ts = datetime.now().isoformat()
     payload_trunc = data[:200]
