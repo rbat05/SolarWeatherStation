@@ -479,6 +479,7 @@
             grid-template-columns: repeat(3, 1fr);
             gap: 15px;
             margin-top: 30px;
+            margin-bottom: 10px;
             border-top: 1px solid #333;
             padding-top: 20px;
         }
@@ -490,6 +491,59 @@
             border-radius: 6px;
             border: 2px solid #444;
             background: rgba(0, 0, 0, 0.3);
+            cursor: zoom-in;
+            transition: transform 180ms ease, box-shadow 180ms ease;
+        }
+
+        .project-images img:hover {
+            transform: scale(1.02);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+        }
+
+        /* Lightbox / expanded image */
+        .lightbox {
+            position: fixed;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 9999;
+            padding: 24px;
+        }
+
+        .lightbox.open {
+            display: flex;
+        }
+
+        .lightbox img {
+            max-width: 96%;
+            max-height: 92%;
+            border-radius: 8px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 2px 8px rgba(255, 255, 255, 0.03) inset;
+        }
+
+        .lightbox .close-btn {
+            position: absolute;
+            right: 18px;
+            top: 18px;
+            background: rgba(255, 255, 255, 0.06);
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 6px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .images-tagline {
+            font-size: 0.95rem;
+            color: var(--lcd-text-dim);
+            margin-top: 8px;
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #333;
+            text-align: center;
         }
 
         /* ─── Mobile Responsiveness ─── */
@@ -528,6 +582,15 @@
         <!-- Project Pitch / Selling Points -->
         <div class="pitch-sidebar">
             <h1>Solar Weather Station</h1>
+
+            <div class="project-images">
+                <img src="./public/images/exterior.png" alt="Solar Weather Station Exterior">
+                <img src="./public/images/diagram.png" alt="Solar Weather Station Diagram">
+                <img src="./public/images/interior.jpg" alt="Solar Weather Station Interior">
+            </div>
+            <div class="images-tagline">Tip: Click any image to expand it.</div>
+
+
             <p>A completely off-grid IoT environmental telemetry system featuring custom-routed hardware, low-power RF
                 networking, and a full-stack interactive dashboard.</p>
 
@@ -564,11 +627,7 @@
                 <span class="tech-tag">ESP-NOW</span>
             </div>
 
-            <div class="project-images">
-                <img src="https://via.placeholder.com/300/222222/8a887e?text=Image+1" alt="Weather Station Hardware 1">
-                <img src="https://via.placeholder.com/300/222222/8a887e?text=Image+2" alt="Weather Station Hardware 2">
-                <img src="https://via.placeholder.com/300/222222/8a887e?text=Image+3" alt="Weather Station Hardware 3">
-            </div>
+
         </div>
 
         <!-- Interactive Dashboard -->
@@ -770,7 +829,7 @@
             // Fetch backwards from today down to 7 days ago
             for (let i = dates.length - 1; i >= 0; i--) {
                 try {
-                    const response = await fetch(`./archive/${dates[i]}.csv`);
+                    const response = await fetch(`./public/archive/${dates[i]}.csv`);
                     if (response.ok) {
                         combinedCSV += await response.text() + "\n";
                     }
@@ -1153,7 +1212,60 @@
         resizeObserver.observe(deviceContainer);
         resizeObserver.observe(deviceBezel);
 
+        // ─── Project Images Lightbox ───
+        (function () {
+            const imgs = document.querySelectorAll('.project-images img');
+            if (!imgs || imgs.length === 0) return;
+
+            const lightbox = document.createElement('div');
+            lightbox.id = 'lightbox';
+            lightbox.className = 'lightbox';
+            lightbox.setAttribute('aria-hidden', 'true');
+
+            const lbImg = document.createElement('img');
+            lbImg.id = 'lightbox-img';
+            lbImg.alt = '';
+            lightbox.appendChild(lbImg);
+
+            const closeBtn = document.createElement('button');
+            closeBtn.className = 'close-btn';
+            closeBtn.id = 'lightbox-close';
+            closeBtn.textContent = 'Close';
+            lightbox.appendChild(closeBtn);
+
+            document.body.appendChild(lightbox);
+
+            function openLightbox(src, alt) {
+                lbImg.src = src;
+                lbImg.alt = alt || '';
+                lightbox.classList.add('open');
+                lightbox.setAttribute('aria-hidden', 'false');
+                document.body.style.overflow = 'hidden';
+            }
+
+            function closeLightbox() {
+                lightbox.classList.remove('open');
+                lightbox.setAttribute('aria-hidden', 'true');
+                lbImg.src = '';
+                document.body.style.overflow = '';
+            }
+
+            imgs.forEach(img => {
+                img.addEventListener('click', () => openLightbox(img.src, img.alt));
+                img.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') openLightbox(img.src, img.alt); });
+                img.tabIndex = 0;
+            });
+
+            lightbox.addEventListener('click', (e) => {
+                if (e.target === lightbox || e.target === closeBtn) closeLightbox();
+            });
+
+            document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeLightbox(); });
+        })();
+
     </script>
+
+    <!-- Lightbox element is created dynamically by script above -->
 </body>
 
 </html>

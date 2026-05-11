@@ -36,3 +36,11 @@ Powered by Chart.js, the main graph renders a strict dot-matrix style line chart
 *   **Live Comparison:** The summary panel displays a side-by-side table comparing the local station's data directly against the regional Open-Meteo API, calculating the exact numerical difference.
 *   **Aggregate Data:** Users can tab through yesterday, the last 3 days, and the last 7 days to view automatically calculated Highs, Lows, and Averages across all metrics.
 *   **System Diagnostics Panel:** A collapsible menu dedicated to hardware health. It displays the timestamp of the last contact, raw payload strings, HTTP response codes, total packets received, and a calculated Packet Loss percentage.
+
+### Deploy Folder
+Inside the `deploy` folder, there is a static version of the dashboard that is used to showcase basic capabilties. To run this, change directory into the folder and start a simple HTTP server:
+```bash
+cd deploy
+python3 -m http.server 8000
+```
+Then navigate to `http://localhost:8000` in your web browser to view the static dashboard.
