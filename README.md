@@ -1,7 +1,7 @@
 # SolarWeatherStation
 An end-to-end, off-grid IoT environmental telemetry system featuring custom hardware, low-power RF bridging, and a retro LCD-themed web dashboard.
 
-![Project Status](https://img.shields.io/badge/status-in--progress-yellow)
+![Project Status](https://img.shields.io/badge/status-complete-green)
 ![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)
 ![Platform: ESP32](https://img.shields.io/badge/platform-ESP32-blue)
 ![Platform: ESP8266](https://img.shields.io/badge/platform-ESP8266-blue)
@@ -10,7 +10,9 @@ An end-to-end, off-grid IoT environmental telemetry system featuring custom hard
 ![Last Commit](https://img.shields.io/github/last-commit/rbat05/SolarWeatherStation)
 
 <p align="center">
-*(ADD HERO PROJECT IMAGE HERE LATER)*
+  <img src="images/exterior.png" alt="Solar Weather Station Exterior" width="45%">
+  <img src="images/dashboard_main.png" alt="Solar Weather Station Dashboard" width="45%"><br>
+  <em>Solar Weather Station Exterior (left) and Dashboard (right)</em>
 </p>
 
 ## Table of Contents
@@ -23,11 +25,14 @@ An end-to-end, off-grid IoT environmental telemetry system featuring custom hard
 6. [System Architecture](#system-architecture)
 7. [Firmware & Code](#firmware--code)
 8. [3D-Printed Parts](#3d-printed-parts)
+9. [License](#license)
 
 ---
 
 ## 1. Overview
 The **Solar Weather Station** is a completely custom-engineered, three-tier IoT ecosystem designed to capture, transmit, and visualize highly accurate micro-climate data. 
+
+>Currently measures **temperature**, **humidity**, **absolute pressure**, and **battery voltage** at 30 seconds intervals.
 
 Operating entirely off-grid, the remote sensor node utilizes solar power and aggressive deep-sleep optimizations to monitor environmental conditions indefinitely. To bypass the extreme battery drain of standard WiFi, it broadcasts lightweight packets via ESP-NOW to a continuously powered indoor Relay node. This Relay acts as a bridge, forwarding the data into a local Python Flask server where it is logged, archived, and displayed on a visually striking, retro-commercial LCD-style dashboard.
 
@@ -50,10 +55,55 @@ Aggressive power-saving techniques were implemented in the ESP32 C++ firmware. B
 This ultra-low consumption allows the station to easily survive extended periods of heavy cloud cover without dropping below critical battery voltages.
 
 ## 4. Design Showcase
-*(ADD DESIGN IMAGES HERE)*
-- Image of the custom PCB routing.
-- Image of the assembled Weather Station inside the Stevenson Screen.
-- Screenshot of the LCD Dashboard.
+
+- **Mechanical Design:** Custom 3D-printed Stevenson Screen with integrated mounting points for the PCB and solar panel. The solar panel sits at a 35-degree angle to maximize sun exposure (in Auckland, NZ) while the louvers provide airflow to ensure accurate sensor readings.
+  <p align="center">
+    <img src="images/mechanical_render.png" alt="Mechanical Render" width="400"><br>
+    <em>3D-Printed Stevenson Screen Render</em>
+  </p>
+
+- **Internal Assembly:** Custom PCB secured inside the Stevenson Screen.
+  <p align="center">
+    <img src="images/interior2.jpg" alt="Solar Weather Station Interior" width="400"><br>
+    <em>Custom PCB Mounted Inside Enclosure</em>
+  </p>
+
+- **LCD Dashboard:** A retro-inspired web interface displaying real-time and historical weather data.
+
+**Dashboard Features:**
+
+- **Live Mode:** Continuously streams real-time environmental data directly from the local SQLite database.
+  <p align="center">
+    <img src="images/dashboard_main.png" alt="Dashboard Main View (Live Mode)" width="400"><br>
+    <em>Main Dashboard View (Live Mode)</em>
+  </p>
+
+- **Historical Replay Engine:** Dynamically loads archived 7-day CSV files into a sandbox database to replay historical weather events without interrupting live data ingestion. Can set custom timeframes to analyze specific events (e.g., a storm).
+  <p align="center">
+    <img src="images/dashboard_replay.png" alt="Dashboard Replay Mode" width="400"><br>
+    <em>Replaying Historical Sandbox Data</em>
+  </p>
+
+- **Local vs. Regional Comparison:** Automatically polls regional telemetry from the Open-Meteo API to compare your micro-climate directly against metropolitan averages (displayed alongside the "Today" summary).
+  <p align="center">
+    <img src="images/dashboard_compare.png" alt="Dashboard Regional Compare" width="400"><br>
+    <em>Local Micro-climate vs. Regional Averages</em>
+  </p>
+
+- **Summary Statistics:** Provides actionable insights and rolling statistics (High, Low, Average) across different timeframes:
+  - **Today:** Current day metrics.
+  - **Yesterday:** A rolling 24-hour window to spot diurnal patterns.
+  - **72 Hours & 7 Days:** Extended views to analyze multi-day weather events and trends.
+
+- **Interactive Graphing:** Powered by Chart.js, the interactive graph can map individual metrics over adjustable time-scales (1 hour, 3 hours, 12 hours, 24 hours, 72 hours, or 7 days):
+  - **Temperature**
+  - **Humidity**
+  - **Absolute Pressure**
+  - **Battery Voltage**
+  <p align="center">
+    <img src="images/dashboard_graph_7day.png" alt="Dashboard 7-Day Graph" width="400"><br>
+    <em>Interactive 7-Day Telemetry Chart</em>
+  </p>
 
 ## 5. Bill of Materials
 ### Remote Weather Station
@@ -91,12 +141,15 @@ The codebase is heavily modularized across three main directories. Please refer 
 
 ## 8. Custom Hardware Integration
 ### Custom PCB (`/pcb`)
-Rather than relying on messy jumper wires and breadboards, the Weather Station relies on a completely custom-designed Printed Circuit Board. This custom PCB integrates the ESP32, charge controllers, and sensor headers into a single, reliable footprint. This minimizes point-of-failure wire disconnects, reduces electrical noise on the I2C/SPI busses, and provides a perfectly dimensioned mounting solution for the 3D-printed case.
+Rather than relying on messy jumper wires and breadboards, the Weather Station relies on a completely custom-designed Printed Circuit Board. This custom PCB integrates the ESP32, charge controllers, and sensor headers into a single, reliable footprint. This minimizes point-of-failure wire disconnects, reduces electrical noise on the I2C/SPI busses, and provides a perfectly dimensioned mounting solution for the 3D-printed case. Designed using KiCAD 10.
 
 ### 3D-Printed Parts (`/cad`)
 All physical enclosures for the project were custom modeled in CAD to fit the bespoke electronics and withstand the elements.
 
 * **Stevenson Screen (Weather Station):** 
-  A classic multi-louvered meteorological enclosure. It is specifically designed to shield the BME280 sensor from direct UV radiation and precipitation while allowing ambient wind/air to freely pass through. This prevents artificial greenhouse heating inside the case, ensuring the temperature readings are a true reflection of the outside air.
+  A classic multi-louvered meteorological enclosure. It is specifically designed to shield the BME280 sensor from direct UV radiation and precipitation while allowing ambient wind/air to freely pass through. This prevents artificial greenhouse heating inside the case, ensuring the temperature readings are a true reflection of the outside air. Provided a .step file for easy modification of the full assembly in any CAD software.
 * **Low-Profile Relay Case:** 
-  This enclosure can be found at [Makerworld](https://makerworld.com/en/models/58547-nodemcu-v2-cp2102-cover#profileId-60347). Credit to Lyron for the original design. A hole was cut onto th etop for the heatsink.
+  This enclosure can be found at [Makerworld](https://makerworld.com/en/models/58547-nodemcu-v2-cp2102-cover#profileId-60347). Credit to Lyron for the original design. A hole was cut on the top for the heatsink.
+
+## 9. License
+This project is licensed under the GNU General Public License v3.0 (GPL-3.0).
